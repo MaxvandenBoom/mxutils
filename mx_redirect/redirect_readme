@@ -1,0 +1,2 @@
+This folder allows the usage of some functions without namespacing (e.g. use 'readVol' directly instead 
+of mx.nifti.readVol) by redirecting calls. Might not be the most efficient way, but it works well.
