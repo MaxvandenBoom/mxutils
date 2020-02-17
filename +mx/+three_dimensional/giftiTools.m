@@ -2,9 +2,9 @@
 %   View and editing tools for GIfTI objects. Provides several tools, including 
 %	morping, cutting, navigation and overlays.
 %
-%   giftiTools(figHandle, toolConfig)
+%   giftiTools(input, toolConfig)
 %	
-%   input = A gifti object or an existing patch handle in which the gifti is
+%   input = A gifti object, surface struct or existing patch handle in which the gifti is
 %           plotted. If a patch handle is given then the gifti data (vertices
 %           and faces) will be retrieved from this object
 %
@@ -18,11 +18,17 @@
 %                                         dimension) represents a point; where the second dimension (colums)
 %                                         represents the x, y and z coordinates
 %   toolConfig.pointSet#                  (2, 3 ..., input same as above)
-%   toolConfig.pointSet#Color           = (optional) color to be used for pointset (e.g. 'b' will result in blue star markers)
+%
+%   toolConfig.pointSet#Type            = (optional) how to display the points; either 'points' (default) or 'disks'
 %   toolConfig.pointSet#Marker          = (optional) marker to be used for pointset (e.g. '*' will result in star markers)
-%   toolConfig.pointSet#WireSphereRad   = (optional) each point will have a wire-sphere surrounding it, the
-%                                         given value will define the sphere's radius
+%   toolConfig.pointSet#Size            = (optional) size of the point marker (type 'points') or radius of the disks (type 'disks')
+%   toolConfig.pointSet#Color           = (optional) color as [R G B] to be used for pointset (e.g. [0 0 1] will result in blue points/disks)
+%   toolConfig.pointSet#WireSphereRad   = (optional) setting this value will enable the drawing a wire-sphere around each point; the
+%                                         given value here will define the sphere's radius
 %   toolConfig.pointSet#WireSphereCol   = (optional) color to be used for the wire-spheres (default will be the same as point color)
+%   toolConfig.pointSet#Text            = (optional) array of strings, a text should be given for each point.
+%   toolConfig.pointSet#TextColor       = (optional) color to be used for the point texts (e.g. 'b' will result in blue text)
+%   toolConfig.pointSet#TextSize        = (optional) text size to be used for the point texts (e.g. '8' will result in text with a font size of 8)
 %
 %   toolConfig.lineSet1                 = (optional) matrix of lines to plot. Each row in the matrix (first
 %                                         dimension) represents a line. The first three columns (second dimension
@@ -30,9 +36,9 @@
 %                                         line, whereas the last three columns represent the x, y and z coordinates
 %                                         of the end of the line
 %   toolConfig.lineSet#                   (2, 3 ..., input same as above)
-%   toolConfig.lineSet#Color            = (optional) color to be used for lineset (e.g. 'b' will result in blue lines)
+%   toolConfig.lineSet#Color            = (optional) color as [R G B] to be used for lineset (e.g. [0 0 1] will result in blue lines)
 %   toolConfig.lineSet#Size             = (optional) size to be used for lineset (e.g. '1.5' will result in lines with 1.5 thickness)
-%   toolConfig.lineSet#WireCylinderRad  = (optional) each line will have a wire-cylinder surrounding it, the
+%   toolConfig.lineSet#WireCylinderRad  = (optional) settings this value will enable the drawing of a wire-cylinder around the line, the
 %                                         given value will define the cylinder's radius
 %   toolConfig.lineSet#WireCylinderCol  = (optional) color to be used for the wire-cylinders (default will be the same as line color)
 %
@@ -136,7 +142,7 @@
 %       giftiTools(figHandle, toolConfig);
 %
 %
-%   Copyright (c) 2019, Max van den Boom
+%   Copyright 2019, Max van den Boom
 
 %   This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
 %   as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -243,6 +249,7 @@ function giftiTools(input, toolConfig)
     globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFaces = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot = {};
+    globalVarsMx.(['giftiFig', num2str(figNum)]).hull = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).faceNormals = [];
@@ -367,19 +374,86 @@ function giftiTools(input, toolConfig)
             if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'Marker'])
                 globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointSetID} = toolConfig.(['pointSet', num2str(pointSetID), 'Marker']);
             end
+            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointSetID} = 5;
+            if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'Size'])
+                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointSetID} = toolConfig.(['pointSet', num2str(pointSetID), 'Size']);
+            end
             globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetColor{pointSetID} = [0 0 1];
             if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'Color'])
                 globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetColor{pointSetID} = toolConfig.(['pointSet', num2str(pointSetID), 'Color']);
             end
+            if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'Type']) && strcmpi(toolConfig.(['pointSet', num2str(pointSetID), 'Type']), 'disks')
+                % type disks
+                
+                % disk constants
+                diskPointsPerCircle = 30;         % number of points per disk
+                
+                % retrieve the points
+                points = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID};
+                
+                % check and retrieve the hull
+                checkHull(figNum);
+                hull = globalVarsMx.(['giftiFig', num2str(figNum)]).hull;
+
+                % get the first edges of each triangle as unit vectors and calculate the normals (as unit vectors)
+                e0 = hull.vertices(hull.faces(:, 2), :) - hull.vertices(hull.faces(:, 1), :);
+                e1 = hull.vertices(hull.faces(:, 3), :) - hull.vertices(hull.faces(:, 1), :);
+                e0 = e0 ./ vecnorm(e0')';
+                normals = cross(e0, e1);
+                normals = normals ./ vecnorm(normals')';
+
+                % determine the rotation matrices for each triangle
+                trRotMat = cat(3, cross(e0, normals), e0, normals);
+                trRotMat = permute(trRotMat, [1 3 2]);
             
-            hold on;
-            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointSetID} = plot3(  globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
-                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(:,1), ...
-                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(:,2), ...
-                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(:,3), ...
-                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointSetID}, ...
-                                                                                            'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetColor{pointSetID});
-            hold off;
+                % calculate the closest face to each point
+                [~, P, F] = closestFace(hull.faces, hull.vertices, points, normals);
+                
+                % create a base disk
+                baseDisk = build3DCircle(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointSetID}, diskPointsPerCircle);
+                
+                % loop through and plot the disks
+                hold on;
+                points = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID};
+                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisk{pointSetID} = [];
+                numDisks = size(points, 1);
+                for iDisk = 1:numDisks
+                    
+                    % copy the base disk
+                    cDisk = baseDisk;
+                    
+                    % rotate the disk
+                    cDisk = (cDisk' * squeeze(trRotMat(F(iDisk), :, :)))';
+                    
+                    % position the disk (project)
+                    cDisk(1, :) = cDisk(1, :) + P(iDisk, 1) + normals(F(iDisk), 1) * -0.5;
+                    cDisk(2, :) = cDisk(2, :) + P(iDisk, 2) + normals(F(iDisk), 1) * -0.5;
+                    cDisk(3, :) = cDisk(3, :) + P(iDisk, 3) + normals(F(iDisk), 1) * -0.5;
+                    
+                    % add disk patch
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisk{pointSetID}(end + 1) = ...
+                        patch(cDisk(1, :), cDisk(2, :), cDisk(3, :), 'r');
+                    %material([0.4, 0.8, 0.0]);   % sets the ambient/diffuse/specular strength of the objects
+                    %material(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisk{pointSetID}(end), 'metal');
+                    material(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisk{pointSetID}(end), [1, 1, 0.0]);
+                end
+                hold off;
+                
+            else
+                % type points
+                
+                % plot points
+                hold on;
+                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointSetID} = plot3(  globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
+                                                                                                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(:,1), ...
+                                                                                                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(:,2), ...
+                                                                                                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(:,3), ...
+                                                                                                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointSetID}, ...
+                                                                                                'MarkerSize', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointSetID}, ...
+                                                                                                'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetColor{pointSetID});
+                hold off;
+                
+            end
             
             % check if wire-spheres should be drawn around the points
             if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'WireSphereRad'])
@@ -421,10 +495,10 @@ function giftiTools(input, toolConfig)
                     cSphere = reshape(cSphere, 3, size(baseSphere, 2), size(baseSphere, 3));
                     allSpheres = cat(3, allSpheres, cSphere);
                 end
-
-                hold on;
+                
                 % loop through all the circles that define the spheres and draw
                 % them as seperate line segments
+                hold on;
                 numCircles = size(allSpheres, 3);
                 for iCircle = 1:numCircles
                     plot3(  globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
@@ -435,6 +509,55 @@ function giftiTools(input, toolConfig)
                 end
                 hold off;
                 
+            end
+            
+            % check if texts should be plotted at the points
+            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextData{pointSetID} = [];
+            if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'Text'])
+
+                % check whether the number of point texts equals the number of points
+                if length(toolConfig.(['pointSet', num2str(pointSetID), 'Text'])) ~= size(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}, 1)
+
+                    % message
+                    fprintf(2, 'Warning: The number of point texts does not equal the number of points in the matrix, ignoring texts\n');
+
+                else
+                    
+                    % retrieve the data
+                    
+                    % store
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextData{pointSetID} = toolConfig.(['pointSet', num2str(pointSetID), 'Text']);
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextColor{pointSetID} = 'r';                    
+                    if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'TextColor'])
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextColor{pointSetID} = toolConfig.(['pointSet', num2str(pointSetID), 'TextColor']);
+                    end
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextSize{pointSetID} = 8;
+                    if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'TextSize'])
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextSize{pointSetID} = toolConfig.(['pointSet', num2str(pointSetID), 'TextSize']);
+                    end
+                    
+                    % plot texts
+                    % TODO:
+
+                    % loop through the points and plot text
+                    hold on;
+                    numTexts = length(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextData{pointSetID});
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextPlot{pointSetID} = [];
+                    for iText = 1:numTexts
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextPlot{pointSetID}(end + 1) = ...
+                            text(   globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(iText, 1), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(iText, 2), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID}(iText, 3), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextData{pointSetID}(iText), ...
+                                    'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextColor{pointSetID}, ...
+                                    'HorizontalAlignment', 'left', ...
+                                    'FontSize', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetTextSize{pointSetID});
+                    end
+                    hold off;                    
+                    
+                end
+
             end
             
         end
@@ -739,7 +862,7 @@ function giftiTools(input, toolConfig)
         
         % determine the text positions, set them at one normal distance
         textPositions = globalVarsMx.(['giftiFig', num2str(figNum)]).faceNormals;
-        textPositions = textPositions * 1;
+        textPositions = textPositions * -1;
         textPositions = globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters + textPositions;
         
         % loop through the normals and plot text
@@ -1530,7 +1653,7 @@ function giftiTools(input, toolConfig)
     
     % set the standard lighting and material properties
     lighting(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, 'gouraud');
-    material(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, 'dull');
+    material(globalVarsMx.(['giftiFig', num2str(figNum)]).patchHandle, 'dull');
     %material([0.4, 0.8, 0.0]);   % sets the ambient/diffuse/specular strength of the objects
     
     % set the initial coloring
@@ -1859,28 +1982,33 @@ function keyReleaseFnc(~, event, figNum)
             % check and make sure the vertex normals are available
             checkVertexNormals(figNum);
             
-            % retrieve the normals of the vertices
-            selAverageNormal = globalVarsMx.(['giftiFig', num2str(figNum)]).vertexNormals(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices, :);
-            selAverageNormal = mean(selAverageNormal, 1);
-            
-            % calculate the normal of the triangle (if it would be created with this order of vertices)
-            sel = double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices, :));
-            AB = sel(2, :) - sel(1, :);
-            AC = sel(3, :) - sel(1, :);
-            newTriangleNormal = cross(AB,AC);
-            newTriangleNormal = newTriangleNormal / norm(newTriangleNormal);
-            
-            % calculate the angle between the average normal vector of the
-            % selected vertices and the normal of the future triangle
-            angle = atan2(norm(cross(selAverageNormal, newTriangleNormal)), dot(selAverageNormal, newTriangleNormal));
-            
-            % check if future triangle normal would be pointing more
-            % than 90 degrees away from the average normal
-            if angle > deg2rad(90)
-                % pointing the other way
+            % check if there are normals available
+            if ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexNormals)
                 
-                % reverse order of vertices
-                globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices = flip(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices);
+                % retrieve the normals of the vertices
+                selAverageNormal = globalVarsMx.(['giftiFig', num2str(figNum)]).vertexNormals(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices, :);
+                selAverageNormal = mean(selAverageNormal, 1);
+
+                % calculate the normal of the triangle (if it would be created with this order of vertices)
+                sel = double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices, :));
+                AB = sel(2, :) - sel(1, :);
+                AC = sel(3, :) - sel(1, :);
+                newTriangleNormal = cross(AB,AC);
+                newTriangleNormal = newTriangleNormal / norm(newTriangleNormal);
+
+                % calculate the angle between the average normal vector of the
+                % selected vertices and the normal of the future triangle
+                angle = atan2(norm(cross(selAverageNormal, newTriangleNormal)), dot(selAverageNormal, newTriangleNormal));
+
+                % check if future triangle normal would be pointing more
+                % than 90 degrees away from the average normal
+                if angle > deg2rad(90)
+                    % pointing the other way
+
+                    % reverse order of vertices
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices = flip(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices);
+
+                end
                 
             end
             
@@ -1892,7 +2020,10 @@ function keyReleaseFnc(~, event, figNum)
             end
             
             % message
-            disp(['Succesfully added face ', num2str(length(globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces))]);
+            strVertices = sprintf('%.0f, ', globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices);
+            strVertices = strVertices(1:end-2);
+            disp([  'Succesfully added face ', num2str(length(globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces)), ...
+                    ' (', strVertices, ')']);
             
             % update the geometry and coloring
             updateGeometry(figNum, 0);
@@ -2047,7 +2178,16 @@ function keyReleaseFnc(~, event, figNum)
                 
             end
             
-            vecMove = vecMove * 0.5;
+            % detect modifiers (shift/control/alt)
+            modifiers = get(globalVarsMx.(['giftiFig', num2str(figNum)]).figHandle,'CurrentModifier');
+            shiftPressed = ismember('shift',   modifiers);
+
+            % determine the amount of movement
+            if shiftPressed == 1
+                vecMove = vecMove * 0.1;
+            else
+                vecMove = vecMove * 0.5;
+            end
             
             % move the vertices
             globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(movVertices, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(movVertices, :) + vecMove;
@@ -2120,6 +2260,7 @@ function patchMouseDownFnc(~, hit, figNum)
         
         % calculate the distance from the interception point to the vertices       
         distances = sqrt(sum((vertices - hit.IntersectionPoint) .^ 2, 2));
+        
         
         % check which vertices could be within the range to be part of the clicked face
         withinVertices = distances < globalVarsMx.(['giftiFig', num2str(figNum)]).edgeMax * 1.5;
@@ -2281,7 +2422,7 @@ function mouseDownFnc(src, ~, figNum)
 
         % check which button was clicked
         st = get(src,'SelectionType');
-        if strcmpi(st,'normal') || strcmpi(st,'extend')
+        if strcmpi(st, 'normal') || strcmpi(st, 'extend')
             % left mousebutton (normal) or shift and left (extend)
 
             % check if no modifier was pressed
@@ -2474,37 +2615,63 @@ end
 %%%
 
 % make sure triangulation is available
-function checkTriangulation (figNum)
+function checkHull(figNum)
     global globalVarsMx;
-    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation)
-    globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation = triangulation( double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces), ...
-                                                                                double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices));        
+    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).hull) && ...
+       ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces) && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices)
+
+        % copy the surface
+        globalVarsMx.(['giftiFig', num2str(figNum)]).hull = struct();
+        globalVarsMx.(['giftiFig', num2str(figNum)]).hull.vertices = double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices);
+        globalVarsMx.(['giftiFig', num2str(figNum)]).hull.faces = double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces);
+       
+        % (optional) smooth before creating hull
+        if size(globalVarsMx.(['giftiFig', num2str(figNum)]).hull.faces, 1) > 10000
+            globalVarsMx.(['giftiFig', num2str(figNum)]).hull = reducepatch(globalVarsMx.(['giftiFig', num2str(figNum)]).hull, 10000);     
+        end
+       
+        % create hull
+        globalVarsMx.(['giftiFig', num2str(figNum)]).hull.faces = convhulln(double(globalVarsMx.(['giftiFig', num2str(figNum)]).hull.vertices));     
+                                                                            
+    end
+end
+
+
+% make sure triangulation is available
+function checkTriangulation(figNum)
+    global globalVarsMx;
+    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation) && ...
+       ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces) && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices)
+
+        globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation = triangulation( double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces), ...
+                                                                                    double(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices));        
+                                                                            
     end
 end
 
 % make sure face centers are available
-function checkFaceCenters (figNum)
+function checkFaceCenters(figNum)
     global globalVarsMx;
     checkTriangulation(figNum);
-    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters)
+    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters) && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation)
         globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters = incenter(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation);
     end
 end
 
 % make sure face normals are available
-function checkFaceNormals (figNum)
+function checkFaceNormals(figNum)
     global globalVarsMx;
     checkTriangulation(figNum);
-    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).faceNormals)
+    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).faceNormals) && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation)
         globalVarsMx.(['giftiFig', num2str(figNum)]).faceNormals = faceNormal(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation);
     end
 end
 
 % make sure vertex normals are available
-function checkVertexNormals (figNum)
+function checkVertexNormals(figNum)
     global globalVarsMx;
     checkTriangulation(figNum);
-    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexNormals)
+    if isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexNormals) && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation)
         globalVarsMx.(['giftiFig', num2str(figNum)]).vertexNormals = vertexNormal(globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation);
     end
 end
@@ -3028,7 +3195,6 @@ function btnPrintConfig(~, ~, figNum)
     cu = camup(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
     disp(['toolConfig.camUp                    = [', num2str(cu(1)), ', ', num2str(cu(2)), ', ', num2str(cu(3)) ,'];']);
     disp(['toolConfig.camVA                    = ', num2str(camva(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle)), ';']);
-    
     
     
 end
@@ -3976,4 +4142,44 @@ function [spherePoints] = build3DWireSphere(radius, vertCircles, pointsPerCircle
     spherePoints(:, :, end - 1) = roty(60) * spherePoints(:, :, end - 1);
     spherePoints(:, :, end) = rotz(180) * roty(60) * spherePoints(:, :, end);
 
+end
+
+function [D, P, F] = closestFace(faces,vertices,points,normals)
+    r1 = vertices(faces(:, 1), :);
+    r2 = vertices(faces(:, 2), :);
+    r3 = vertices(faces(:, 3), :);
+    qp = permute(points,[3, 2, 1]);
+    vq = bsxfun(@minus, qp, r1);
+    D = dot2(vq, normals);
+    rD = bsxfun(@times, normals, D);
+    P = bsxfun(@minus, qp, rD);
+    
+    r31r31 = sum((r3 - r1) .^ 2, 2);
+    r21r21 = sum((r2 - r1) .^ 2, 2);
+    r21r31 = dot(r2 - r1, r3 - r1, 2);
+    r31vq = dot2(r3 - r1, vq);
+    r21vq = dot2(r2 - r1, vq);
+    d = r31r31 .* r21r21 - r21r31.^2;
+    bary = NaN(size(faces, 1), 2, size(points, 1));
+    bary(:, 1, :) = bsxfun(@rdivide, bsxfun(@times, r21r21, r31vq) - bsxfun(@times, r21r31, r21vq), d); 
+    bary(:, 2, :) = bsxfun(@rdivide, bsxfun(@times, r31r31, r21vq) - bsxfun(@times, r21r31, r31vq), d); 
+    bary(:, 3, :) = 1 - bary(:, 1, :) - bary(:, 2, :);
+    
+    D(any(bary <= 0,2) | any(bary >= 1, 2)) = NaN;
+    D(abs(d) <= eps, :, : ) = NaN;
+    
+    [~, I] = min(abs(D), [], 1);
+    I = squeeze(I);
+    D = D(sub2ind(size(D), I, ones(length(I), 1), (1:length(I))'));
+    D = squeeze(D);
+    P = permute(P, [2, 1, 3]);
+    sz = [size(P) 1 1];
+    P = P(:, sub2ind(sz(2:3), I, (1:length(I))'));
+    P = P';
+    F = I;
+end
+
+function d = dot2(A,B)
+    % dot product along 2nd dimension with singleton extension
+    d = sum(bsxfun(@times,A,B),2);
 end
