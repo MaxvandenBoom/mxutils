@@ -19,6 +19,7 @@
 %       FaceAreas               = calculate the area of each face and display as text over each face
 %       Merge                   = Merge the different surfaces together, each surface will be displayed in different color
 %       Disks<radius>           = Show points as disks
+%       PointProject            = Project the points onto surface
 %       WireSpheres<radius>     = Show wire-spheres around each point
 %       WireCylinders<radius>   = Show wire-cylinders around each line
 %
@@ -73,6 +74,7 @@ function viewGii( varargin )
     displayArgs = {};
     mergeGiftis = 0;
     showPointDisks = 0;
+    showPointProject = 0;
     showPointWireSpheres = 0;
     showLineWireCylinders = 0;
     
@@ -89,23 +91,23 @@ function viewGii( varargin )
         dummy.tri = [1,2,3];
         varargin{1} = gifti(dummy);
     end
-                
+    
     % loop through the input arguments
     for i = 1:nargin
         if isstruct(varargin{i}) || isa(varargin{i}, 'gifti') || (length(varargin{i}) == 1 && ishandle(varargin{i}))
-            % if struct or handle
+            % surface, if struct or handle
             
             % add as gifti
             giftis{end + 1} = varargin{i};
 
         elseif isa(varargin{i}, 'char')
-            % check if the argument is a string (char array)
+            % single string, check if the argument is a string (char array)
             
             % add as display argument
             displayArgs{end + 1} = varargin{i};
             
         elseif size(varargin{i}, 1) == 3 || size(varargin{i}, 2) == 3
-            % if vector/matrix where the size of one dimenion is 3
+            % point matrix, if vector/matrix where the size of one dimenion is 3
             
             if size(varargin{i}, 2) ~= 3 && size(varargin{i}, 1) == 3
                 varargin{i} = varargin{i}';
@@ -115,7 +117,7 @@ function viewGii( varargin )
             pointMatrices{end + 1} = varargin{i};
             
         elseif size(varargin{i}, 1) == 6 || size(varargin{i}, 2) == 6
-            % if vector/matrix where the size of one dimenion is 6
+            % line matrix, if vector/matrix where the size of one dimenion is 6
             
             if size(varargin{i}, 2) ~= 6 && size(varargin{i}, 1) == 6
                 varargin{i} = varargin{i}';
@@ -125,7 +127,7 @@ function viewGii( varargin )
             lineMatrices{end + 1} = varargin{i};
             
         elseif iscell(varargin{i}) || isstring(varargin{i}) && (size(varargin{i}, 1) == 1 || size(varargin{i}, 2) == 1)
-            % if vector is cell-array or a string-array and size of one dimenion is 1
+            % text, if vector is cell-array or a string-array and size of one dimenion is 1
             
             if size(varargin{i}, 2) ~= 1 && size(varargin{i}, 1) == 1
                 varargin{i} = varargin{i}';
@@ -183,7 +185,7 @@ function viewGii( varargin )
                 mergeGiftis = 1;
             end
             
-            if contains(displayArgument, 'showDisks', 'IgnoreCase', true) || contains(displayArgument, 'Disks', 'IgnoreCase', true)
+            if contains(displayArgument, 'showPointDisks', 'IgnoreCase', true) || contains(displayArgument, 'showDisks', 'IgnoreCase', true) || contains(displayArgument, 'Disks', 'IgnoreCase', true)
                 try
                     radius = str2num(displayArgument(strfind(lower(displayArgument), lower('Disks')) + 5:end));
                     if isempty(radius) || radius < 1,   radius = 3; end;
@@ -191,6 +193,9 @@ function viewGii( varargin )
                 catch
                     showPointDisks = 3;
                 end
+            end
+            if contains(displayArgument, 'showPointProject', 'IgnoreCase', true) || contains(displayArgument, 'PointProject', 'IgnoreCase', true) || contains(displayArgument, 'Project', 'IgnoreCase', true)
+                showPointProject = 1;
             end
             if contains(displayArgument, 'showPointWireSpheres', 'IgnoreCase', true) || contains(displayArgument, 'WireSpheres', 'IgnoreCase', true)
                 try
@@ -283,7 +288,7 @@ function viewGii( varargin )
         % loop through the point vectors/matrices
         for j = 1:length(pointMatrices)
             pointMarker = '*';
-            pointSize = 5;
+            pointSize = 8;
             pointColor = colors{colorIndex};
             colorIndex = colorIndex + 1;
             
@@ -295,6 +300,9 @@ function viewGii( varargin )
                 toolConfig.(['pointSet', num2str(j), 'Size']) = showPointDisks;
             else
                 toolConfig.(['pointSet', num2str(j), 'Size']) = pointSize;    
+            end
+            if showPointProject == 1
+                toolConfig.(['pointSet', num2str(j), 'ProjectToHull']) = 1;    
             end
             if showPointWireSpheres > 0
                 toolConfig.(['pointSet', num2str(j), 'WireSphereRad']) = showPointWireSpheres;
