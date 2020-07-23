@@ -4,6 +4,7 @@
 %   [volumesData, volumesFiles, volumes] = readVols(searchDir)
 %
 %   searchDir  			= the path (and search pattern) to the niftis to be read
+%   firstOnly           = [optional; 0 or 1] only read the first file of the files found
 %
 %   Returns: 
 %       volumesData     = 3D or 4D matrix of image data
@@ -18,8 +19,11 @@
 %   warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 %   You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 %
-function [volumesData, volumesFiles, volumes] = readVols(searchDir)
-
+function [volumesData, volumesFiles, volumes] = readVols(searchDir, firstOnly)
+    if ~exist('firstOnly', 'var')
+        firstOnly = 0;
+    end
+    
     % variable to hold the path to the search directory (regardless of any search pattern)
     searchDirPath = '';
     
@@ -99,6 +103,11 @@ function [volumesData, volumesFiles, volumes] = readVols(searchDir)
             
             % increment the filecounter
             fileCounter = fileCounter + 1;
+        
+            % break the loop if only one file should be read
+            if firstOnly
+                break;
+            end
             
         end
         
