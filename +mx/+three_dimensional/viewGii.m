@@ -6,8 +6,13 @@
 %       surf#                   = surface(s) to display
 % 
 %   Optional arguments:
-%       <pointMatrix#>          = 
-%       <lineMatrix#>           = 
+%       <pointMatrix#>          = Nx3 matrix of points to plot. Each row in the
+%                                 matrix (first dimension) represents a point; the
+%                                 second dimension (colums) represent the x, y and z
+%                                 coordinates of each point
+%       <lineMatrix#>           = Nx6 matrix of lines to plot. Each row in the
+%                                 matrix (first dimension) represents a line; the
+%                                 second dimension (colums) represent the x1, y1, z1, x2, y2, z2 coordinates
 %       <textCellArray>         = 
 %       Wireframe               = display the wireframe of the surface
 %       Vertices                = display the vertices of the surface
@@ -106,8 +111,11 @@ function viewGii( varargin )
             % add as display argument
             displayArgs{end + 1} = varargin{i};
             
-        elseif size(varargin{i}, 1) == 3 || size(varargin{i}, 2) == 3
-            % point matrix, if vector/matrix where the size of one dimenion is 3
+        elseif (size(varargin{i}, 2) == 3 || (size(varargin{i}, 1) == 3 && size(varargin{i}, 2) ~= 6)) && size(varargin{i}, 3) == 1
+            % 2D point matrix, if 2D matrix where the size of the second dimenion is 3
+            % or accidentally transposed (except for when the number of the second
+            % dimension is six, because a second dimension of 6 signifies a
+            % lineset)
             
             if size(varargin{i}, 2) ~= 3 && size(varargin{i}, 1) == 3
                 varargin{i} = varargin{i}';
@@ -115,6 +123,19 @@ function viewGii( varargin )
             
             % add as point matrix
             pointMatrices{end + 1} = varargin{i};
+
+        elseif (size(varargin{i}, 2) == 3) && size(varargin{i}, 3) > 1
+            % multiple 2D point matrices, if vector/matrix where the size of either the 
+            % first or second dimenion is 3 and the third dimension is more than 1
+            
+            if size(varargin{i}, 2) ~= 3 && size(varargin{i}, 1) == 3
+                varargin{i} = permute(varargin{i}, [2 1 3]);
+            end
+            
+            % add the point matrices
+            for iPointMatrix = 1:size(varargin{i}, 3)
+                pointMatrices{end + 1} = varargin{i}(:, :, iPointMatrix);
+            end
             
         elseif size(varargin{i}, 1) == 6 || size(varargin{i}, 2) == 6
             % line matrix, if vector/matrix where the size of one dimenion is 6
@@ -188,7 +209,7 @@ function viewGii( varargin )
             if contains(displayArgument, 'showPointDisks', 'IgnoreCase', true) || contains(displayArgument, 'showDisks', 'IgnoreCase', true) || contains(displayArgument, 'Disks', 'IgnoreCase', true)
                 try
                     radius = str2num(displayArgument(strfind(lower(displayArgument), lower('Disks')) + 5:end));
-                    if isempty(radius) || radius < 1,   radius = 3; end;
+                    if isempty(radius) || radius < 1,   radius = 3; end
                     showPointDisks = radius;
                 catch
                     showPointDisks = 3;
@@ -197,19 +218,19 @@ function viewGii( varargin )
             if contains(displayArgument, 'showPointProject', 'IgnoreCase', true) || contains(displayArgument, 'PointProject', 'IgnoreCase', true) || contains(displayArgument, 'Project', 'IgnoreCase', true)
                 showPointProject = 1;
             end
-            if contains(displayArgument, 'showPointWireSpheres', 'IgnoreCase', true) || contains(displayArgument, 'WireSpheres', 'IgnoreCase', true)
+            if contains(displayArgument, 'showPointWireSpheres', 'IgnoreCase', true) || contains(displayArgument, 'WireSphere', 'IgnoreCase', true)
                 try
                     radius = str2num(displayArgument(strfind(lower(displayArgument), lower('WireSpheres')) + 11:end));
-                    if isempty(radius) || radius < 1,   radius = 3; end;
+                    if isempty(radius) || radius < 1,   radius = 3; end
                     showPointWireSpheres = radius;
                 catch
                     showPointWireSpheres = 3;
                 end
             end
-            if contains(displayArgument, 'showLineWireCylinders', 'IgnoreCase', true) || contains(displayArgument, 'WireCylinders', 'IgnoreCase', true)
+            if contains(displayArgument, 'showLineWireCylinders', 'IgnoreCase', true) || contains(displayArgument, 'WireCylinder', 'IgnoreCase', true)
                 try
                     radius = str2num(displayArgument(strfind(lower(displayArgument), lower('WireCylinders')) + 13:end));
-                    if isempty(radius) || radius < 1,   radius = 3; end;
+                    if isempty(radius) || radius < 1,   radius = 3; end
                     showLineWireCylinders = radius;
                 catch
                     showLineWireCylinders = 3;
@@ -291,6 +312,7 @@ function viewGii( varargin )
             pointSize = 8;
             pointColor = colors{colorIndex};
             colorIndex = colorIndex + 1;
+            if colorIndex > length(colors), colorIndex = 1; end
             
             toolConfig.(['pointSet', num2str(j)]) = pointMatrices{j};
             toolConfig.(['pointSet', num2str(j), 'Marker']) = pointMarker;
@@ -320,6 +342,7 @@ function viewGii( varargin )
             lineSize = 1;
             lineColor = colors{colorIndex};
             colorIndex = colorIndex + 1;
+            if colorIndex > length(colors), colorIndex = 1; end
             
             toolConfig.(['lineSet', num2str(j)]) = lineMatrices{j};
             toolConfig.(['lineSet', num2str(j), 'Color']) = lineColor;
