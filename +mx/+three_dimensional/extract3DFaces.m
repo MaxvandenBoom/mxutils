@@ -1,12 +1,13 @@
-%   Extract and reconstruct part of a 3D mesh from a gifti based on a matrix
-%   of faces that should make up the new mesh
+%
+%   Extract and reconstruct part of a 3D object to make up the new object
 %
 %   [vertexMatrix, facesMatrix, vertexConversion] = extract3DByFaces(inputGifti, extractFaceIndices)
 %   [vertexMatrix, facesMatrix, vertexConversion] = extract3DByFaces(vertices, faces, extractFaceIndices)
 %   
-%   inputGifti           = the input gifti to extract the mesh from
-%   (or vertices, faces) = the input as a vertex matrix (N x 3) and faces matrix (N x 3)
-%   extractFaceIndices   = a vector with the indices of faces which should be extracted
+%       inputGifti           = the input gifti to extract the 3D object from
+%       vertices, faces      = the input object as a vertex matrix (N x 3) and faces matrix (N x 3)
+%       extractFaceIndices   = a vector with the indices of faces which should be extracted
+%
 %
 %   Returns: 
 %       vertexMatrix     = the new vertex matrix
