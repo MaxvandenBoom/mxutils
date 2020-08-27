@@ -573,11 +573,17 @@ function giftiTools(input, toolConfig)
                 values = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetValues{pointsetCounter};
                 range = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetColormapRange{pointsetCounter};
                 
+                if isrow(values)    values = values';   end
+                if size(values, 2) > 1
+                    fprintf(2, 'Error: point-set values should by Nx1\n');
+                end
+                
                 % convert the values to a scale between 0-1 (given the range)
                 rangeDiff = diff(range);
-                values = (values + abs(range(1))) / rangeDiff;
+                values = (values - range(1)) / rangeDiff;
                 values(values < 0) = 0;
                 values(values > 1) = 1;
+                values = values';
                 
                 % determine the r-g-b color values for each vertex based on the (relative) activity value and colormap
                 colors      = [ interp1(linspace(0, 1, size(pointSetColormap(:, 1), 1)), pointSetColormap(:, 1), values); ...
