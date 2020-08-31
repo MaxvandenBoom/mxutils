@@ -96,13 +96,6 @@ function [samplePoints, sampleTriangles] = genRandomSamplePoints3DObject(obj3D, 
     % first or last triangle is neglectable)
     sampleTriangles = rand(1, numSamples) * cumAreas(end);
 
-    % debug, test value to triangle mapping
-    %sampleTriangles(1) = 0;
-    %sampleTriangles(2) = 6;
-    %sampleTriangles(3) = 266;
-    %sampleTriangles(4) = 3.9889578e+03; & total sum of areas
-    %sampleTriangles(5) = 3.9889592e+03; % total cumulative (will not map, but impossible value due to open interval rand)
-    %sampleTriangles(6) = 3.9889591e+03; % slightly less than total cumulative
 
     % determine which triangle based on the random (area) value
     inTriangle = (sampleTriangles >= [0; cumAreas(1:end - 1)] & sampleTriangles < cumAreas);
@@ -115,26 +108,6 @@ function [samplePoints, sampleTriangles] = genRandomSamplePoints3DObject(obj3D, 
     if numSamples ~= length(sampleTriangles)
         fprintf(2, 'Warning: random drawn triangles not equal to number of expected samples, debug\n');
     end
-
-    % debug, check weighted randomization (more surface, more hits by randomization)
-    %{
-    nonWeightedsampleTriangles = randi([1,200], numSamples, 1);
-    areaHits = zeros(length(areas), 1);
-    for i = 1:length(areas)
-        areaHits(i) = sum(nonWeightedsampleTriangles == i);    
-    end
-    [r, p] = corr(areaHits, areas);
-    disp(['unweighted - rho: ', num2str(r), ' - p: ', num2str(p)]);
-
-    figure; scatter(areaHits, areas);
-    areaHits = zeros(length(areas), 1);
-    for i = 1:length(areas)
-        areaHits(i) = sum(sampleTriangles == i);    
-    end
-    [r, p] = corr(areaHits, areas);
-    disp(['weighted - rho: ', num2str(r), ' - p: ', num2str(p)]);
-    figure; scatter(areaHits, areas);
-    %}
 
     
     %
