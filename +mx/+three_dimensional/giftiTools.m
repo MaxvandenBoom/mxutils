@@ -101,9 +101,9 @@
 %   toolConfig.morph                    = (optional) 
 %
 %   toolConfig.yokeCam                  = (optional) yoke the cam with other gifti displays [0 or 1]
-%   toolConfig.showWireframe            = (optional) whether the wireframe of the model is shown [0 or 1]
-%   toolConfig.showVertices             = (optional) whether the vertices of the model are shown [0 or 1]
-%   toolConfig.showFaceCenters          = (optional) calculate and show the face/triangle centers [0 or 1]
+%   toolConfig.showWireframe            = (optional) whether the wireframe of the 3D object is shown [0 or 1]
+%   toolConfig.showVertices             = (optional) whether the vertices of the 3D object are shown [0 or 1]
+%   toolConfig.showFaceCenters          = (optional) calculate and show the face/triangle centers of the 3D object [0 or 1]
 %   toolConfig.showFaceNormals          = (optional) calculate and show the face/triangle normals [0 = off, > 0 = on, where
 %                                         the given value defines the length of the normal lines for display by multiplication
 %                                         of the normals by the given value]
@@ -116,6 +116,7 @@
 %   toolConfig.vertexMarkerEdgeColor    = (optional) edge color of the vertex markers, default [1 0 0]
 %   toolConfig.selectedVertexMarkerEdgeColor = (optional) edge color of the selected vertex markers, default [0 0 1]
 %   toolConfig.selectedFaceColor        = (optional) face color of an selected face, default [0.7 0.7 1]
+%   toolConfig.showLinepoints           = (optional) whether the points that make up the lines in a line-set are shown [0 or 1]
 %   
 %   Available colormaps:
 %    
@@ -126,10 +127,11 @@
 %
 %   Controls:
 %
-%      W-key                        = toggle wireframe display
-%      V-key                        = toggle vertex display
+%      W-key                        = toggle 3D object wireframe display
+%      V-key                        = toggle 3D object vertex display
+%      L-key                        = toggle line-set points display
 %      E-key                        = toggle edit mode
-%      S-key                        = Save gifti as...
+%      S-key                        = Save 3D object as...
 %      I-key                        = Print information
 %
 %     View mode
@@ -147,8 +149,8 @@
 %       A-key                       = create new face between three selected vertices
 %       R-key                       = remove the selected faces (plus their unshared vertices) and the selected
 %                                     vertices (including the faces they define)
-%       Arrow-keys                  = move the selected vertices and faces left, right, up or down (from the perspective of the camera)
-%       Page-up and Page-down       = move the selected vertices and faces toward (page-up) or away (page-down) from the camera
+%       Arrow-keys                  = move the selected point/vertices and faces left, right, up or down (from the perspective of the camera)
+%       Page-up and Page-down       = move the selected point/vertices and faces toward (page-up) or away (page-down) from the camera
 %
 % 
 %   Example:
@@ -271,6 +273,7 @@ function giftiTools(input, toolConfig)
     globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices               = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFaces                  = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot              = {};
+    globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints          = [];   %[line-set, index, p1 vs p2]
     globalVarsMx.(['giftiFig', num2str(figNum)]).triangulation                  = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).hull                           = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetNormals                = {};
@@ -321,7 +324,7 @@ function giftiTools(input, toolConfig)
         globalVarsMx.(['giftiFig', num2str(figNum)]).showVertexNormals  = 0;
     end
     globalVarsMx.(['giftiFig', num2str(figNum)]).showFaceAreas          = (isfield(toolConfig, 'showFaceAreas') && toolConfig.showFaceAreas == 1);
-    
+    globalVarsMx.(['giftiFig', num2str(figNum)]).showLinepoints         = (isfield(toolConfig, 'showLinepoints') && toolConfig.showLinepoints == 1);
     
     if isfield(toolConfig, 'backgroundColor')
         if isvector(toolConfig.backgroundColor) && length(toolConfig.backgroundColor) == 3
@@ -720,14 +723,16 @@ function giftiTools(input, toolConfig)
                     % colormap
                     
                     % add to plot
-                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointsetCounter} = scatter3(   globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 1), ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 2), ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 3), ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointsetCounter} * 7, ...
-                                                                                                        colors, ... 
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointsetCounter}, ...
-                                                                                                        'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetLineWidth{pointsetCounter});
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointsetCounter} = ...
+                        scatter3(   globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 1), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 2), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 3), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointsetCounter} * 7, ...
+                                    colors, ... 
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointsetCounter}, ...
+                                    'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetLineWidth{pointsetCounter}, ...
+                                    'HitTest', 'off', 'PickableParts', 'none');
                 else
                     % static color
                     
@@ -737,28 +742,33 @@ function giftiTools(input, toolConfig)
                     % plot points
                     if strcmp(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointsetCounter}, '*')
 
-                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointsetCounter} = plot3(  globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 1), ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 2), ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 3), ...
-                                                                                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointsetCounter}, ...
-                                                                                                        'MarkerSize', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointsetCounter}, ...
-                                                                                                        'Color', color(1:3), ...
-                                                                                                        'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetLineWidth{pointsetCounter}, ...
-                                                                                                        'MarkerFaceColor', markerFaceColor(1:3)  );
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointsetCounter} = ...
+                            plot3(  globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 1), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 2), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 3), ...
+                                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointsetCounter}, ...
+                                    'MarkerSize', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointsetCounter}, ...
+                                    'Color', color(1:3), ...
+                                    'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetLineWidth{pointsetCounter}, ...
+                                    'MarkerFaceColor', markerFaceColor(1:3), ...
+                                    'HitTest', 'off', 'PickableParts', 'none');
+                        
                     else                                                                      
                         
-                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointsetCounter} = scatter3(   globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
-                                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 1), ...
-                                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 2), ...
-                                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 3), ...
-                                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointsetCounter} * 7, ...
-                                                                                                            color(1:3), ...
-                                                                                                            'filled', ...
-                                                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointsetCounter}, ...
-                                                                                                            'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetLineWidth{pointsetCounter}, ...
-                                                                                                            'MarkerFaceColor', markerFaceColor(1:3), ...
-                                                                                                            'MarkerEdgeColor', color(1:3) );
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetPlot{pointsetCounter} = ...
+                            scatter3(   globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
+                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 1), ...
+                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 2), ...
+                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter}(:, 3), ...
+                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSize{pointsetCounter} * 7, ...
+                                        color(1:3), ...
+                                        'filled', ...
+                                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetMarker{pointsetCounter}, ...
+                                        'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetLineWidth{pointsetCounter}, ...
+                                        'MarkerFaceColor', markerFaceColor(1:3), ...
+                                        'MarkerEdgeColor', color(1:3), ...
+                                        'HitTest', 'off', 'PickableParts', 'none');
                     
                     end
                     
@@ -828,7 +838,8 @@ function giftiTools(input, toolConfig)
                             allSpheres(2, :, iCircle), ...
                             allSpheres(3, :, iCircle), ...
                             'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetSphereColor{pointsetCounter}, ...
-                            'LineWidth', 1);
+                            'LineWidth', 1, ...
+                            'HitTest', 'off', 'PickableParts', 'none');
                 end
                 hold off;
                 
@@ -901,13 +912,13 @@ function giftiTools(input, toolConfig)
                 end
 
             end
-            
-        end
         
-        % raise the counter
-        pointsetCounter = pointsetCounter + 1;
-        
+            % raise the counter
+            pointsetCounter = pointsetCounter + 1;
+
+        end        
     end     % end of pointset loop
+    globalVarsMx.(['giftiFig', num2str(figNum)]).numPointSets = pointsetCounter - 1;
     
 
     %%%
@@ -945,13 +956,14 @@ function giftiTools(input, toolConfig)
             lines = globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{linesetCounter};
             globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPlot{linesetCounter} = [];
             for iLine = 1:size(lines, 1)
-                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPlot{linesetCounter}(end + 1) = ...
+                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPlot{linesetCounter}{end + 1} = ...
                     plot3(  globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
                             [lines(iLine, 1), lines(iLine, 4)], ...
                             [lines(iLine, 2), lines(iLine, 5)], ...
                             [lines(iLine, 3), lines(iLine, 6)], ...
                             'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetColor{linesetCounter}, ...
-                            'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetSize{linesetCounter});
+                            'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetSize{linesetCounter}, ...
+                            'HitTest', 'off', 'PickableParts', 'none');
                         
             end
             hold off;
@@ -1017,7 +1029,8 @@ function giftiTools(input, toolConfig)
                                     cCylinder(2, :, iCircle), ...
                                     cCylinder(3, :, iCircle), ...
                                     'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetCylinderColor{linesetCounter}, ...
-                                    'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetSize{linesetCounter});
+                                    'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetSize{linesetCounter}, ...
+                                    'HitTest', 'off', 'PickableParts', 'none');
                     end
                     
                     % loop through the points in the circle to create the spokes
@@ -1028,7 +1041,8 @@ function giftiTools(input, toolConfig)
                                     [cCylinder(2, iSpoke, 1), cCylinder(2, iSpoke, 2)], ...
                                     [cCylinder(3, iSpoke, 1), cCylinder(3, iSpoke, 2)], ...
                                     'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetCylinderColor{linesetCounter}, ...
-                                    'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetSize{linesetCounter});
+                                    'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetSize{linesetCounter}, ...
+                                    'HitTest', 'off', 'PickableParts', 'none');
                     end
                     hold off;
                     
@@ -1036,14 +1050,13 @@ function giftiTools(input, toolConfig)
                 end     % end line (cylinder) loop
                 
             end     % end wirecylinderrad if
-            
-        end
-        
-        % raise the counter
-        linesetCounter = linesetCounter + 1;
-        
-    end     % end of lineset loop
+            % raise the counter
+            linesetCounter = linesetCounter + 1;
 
+        end        
+    end     % end of lineset loop
+    globalVarsMx.(['giftiFig', num2str(figNum)]).numLineSets = linesetCounter - 1;
+    
     
     %%%
     % check, prepare and plot face-text data
@@ -1120,7 +1133,8 @@ function giftiTools(input, toolConfig)
                                                                             globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters(:, 3), ...
                                                                             '*', ...
                                                                             'Color', [1 0 0], ...
-                                                                            'MarkerSize', 6);
+                                                                            'MarkerSize', 6, ...
+                                                                            'HitTest', 'off', 'PickableParts', 'none');
         hold off;
     end
     
@@ -1151,7 +1165,8 @@ function giftiTools(input, toolConfig)
                         [globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters(iNormal, 2), normals(iNormal, 2)], ...
                         [globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters(iNormal, 3), normals(iNormal, 3)], ...
                         'Color', [1 0 0], ...
-                        'LineWidth', 1.0);
+                        'LineWidth', 1.0, ...
+                        'HitTest', 'off', 'PickableParts', 'none');
         end
         hold off;
         
@@ -1181,7 +1196,8 @@ function giftiTools(input, toolConfig)
                         [globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(iNormal, 2), normals(iNormal, 2)], ...
                         [globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(iNormal, 3), normals(iNormal, 3)], ...
                         'Color', [1 0 0], ...
-                        'LineWidth', 1.0);
+                        'LineWidth', 1.0, ...
+                        'HitTest', 'off', 'PickableParts', 'none');
         end
         hold off;
         
@@ -1300,9 +1316,10 @@ function giftiTools(input, toolConfig)
         
     end
     
-    % show or hide the wireframe and vertices
+    % show or hide the wireframe, vertices and points
     showWireframe(figNum, globalVarsMx.(['giftiFig', num2str(figNum)]).showWireframe);
     showVertices(figNum, globalVarsMx.(['giftiFig', num2str(figNum)]).showVertices);
+    showLinepoints(figNum, globalVarsMx.(['giftiFig', num2str(figNum)]).showLinepoints);
     
 
     %%%
@@ -2256,7 +2273,18 @@ function keyReleaseFnc(~, event, figNum)
         showVertices(figNum, globalVarsMx.(['giftiFig', num2str(figNum)]).showVertices);
         
         return;
+
+    elseif(strcmp (event.Key , 'l'))
+        % L-key
         
+        % toggle the line-point display
+        globalVarsMx.(['giftiFig', num2str(figNum)]).showLinepoints = ~globalVarsMx.(['giftiFig', num2str(figNum)]).showLinepoints;
+        
+        % show or hide the vertices
+        showLinepoints(figNum, globalVarsMx.(['giftiFig', num2str(figNum)]).showLinepoints);
+        
+        return;
+         
     elseif(strcmp (event.Key , 'e'))
         % E-key
         
@@ -2289,22 +2317,41 @@ function keyReleaseFnc(~, event, figNum)
     elseif(strcmp (event.Key , 's'))
         % S-key
         
+        %
+        % 3D object as gifti
+        %        
         filter = {'*.gii';'*.*'};
         [file,path] = uiputfile(filter, 'Save gifti as...');
-        if isequal(file,0) || isequal(path,0)
+        if ~isequal(file,0) && ~isequal(path, 0)
            
-        else
-            
             % create gifti to save
             displayGifti.vertices = globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices;
             displayGifti.faces = globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces;
             displayGifti = gifti(displayGifti);
             
             % save the gifti
-            save(displayGifti, fullfile(path,file));
+            save(displayGifti, fullfile(path, file));
             
             % message
-            disp(['Succesfully stored gifti: ', fullfile(path,file)]);
+            disp(['Succesfully stored gifti: ', fullfile(path, file)]);
+            
+        end
+        
+        %
+        % Lines as .mat
+        %
+        filter = {'*.mat';'*.*'};
+        [file, path] = uiputfile(filter, 'Save lines as...');
+        if ~isequal(file,0) && ~isequal(path, 0)
+
+            % retrieve all lines-set data
+            lineSetData = globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData;
+            
+            % save the lines
+            save(fullfile(path, file), 'lineSetData');
+            
+            % message
+            disp(['Succesfully stored lines: ', fullfile(path, file)]);
             
         end
         
@@ -2364,6 +2411,21 @@ function keyReleaseFnc(~, event, figNum)
         if(strcmp (event.Key , 'escape'))
             % escape-key
 
+            % reset the selected points
+            globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints = [];
+            
+            % check if the line-set points are shown
+            if isfield(globalVarsMx.(['giftiFig', num2str(figNum)]), 'lineSetPointPlot') && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot)
+                for lineSetID = 1:globalVarsMx.(['giftiFig', num2str(figNum)]).numLineSets
+                    
+                    % reset the colors in the plot
+                    cData = repmat( globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor, ...
+                                    [length(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}.XData) 1]);
+                    set(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}, 'CData', cData);
+                    
+                end
+            end
+            
             % reset the selected vertices
             globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertices = [];
             
@@ -2493,8 +2555,8 @@ function keyReleaseFnc(~, event, figNum)
                 % get a vertex and faces list of the 3d object with all but the deleted faces
                 % this will renumber the vertices
                 [vertexMatrix, facesMatrix, vertexConversion] = mx.three_dimensional.extract3DFaces(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices, ...
-                                                                               						globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces, ...
-                                                                               						keepFaces);
+                                                                                                    globalVarsMx.(['giftiFig', num2str(figNum)]).displayFaces, ...
+                                                                                                    keepFaces);
 
 
                 % remove the faces and vertices
@@ -2542,6 +2604,11 @@ function keyReleaseFnc(~, event, figNum)
         elseif strcmp(event.Key , 'leftarrow') || strcmp(event.Key , 'rightarrow') || ...
                 strcmp(event.Key , 'uparrow') || strcmp(event.Key , 'downarrow') || ...
                 strcmp(event.Key , 'pageup') || strcmp(event.Key , 'pagedown')
+           
+            
+            %
+            % vertices and faces
+            %
             
             % list of vertices to be moved
             movVertices = [];
@@ -2561,6 +2628,11 @@ function keyReleaseFnc(~, event, figNum)
             movVertices = [movVertices, faceVertices(:)'];
             movVertices = unique(movVertices);
 
+            
+            %
+            % movement vector
+            %
+            
             % retrieve the camup vector as the initial move vector and normalize
             vecMove = camup(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
             
@@ -2614,32 +2686,92 @@ function keyReleaseFnc(~, event, figNum)
                 vecMove = vecMove * 0.5;
             end
             
-            % move the vertices
-            globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(movVertices, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(movVertices, :) + vecMove;
-            globalVarsMx.(['giftiFig', num2str(figNum)]).baseVertices(movVertices, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).baseVertices(movVertices, :) + vecMove;
-            if isfield(globalVarsMx.(['giftiFig', num2str(figNum)]), 'secVertices')
-                globalVarsMx.(['giftiFig', num2str(figNum)]).secVertices(movVertices, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).secVertices(movVertices, :) + vecMove;
+            
+            %
+            % move line-set points
+            %
+
+            if globalVarsMx.(['giftiFig', num2str(figNum)]).showLinepoints && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints)
+                    
+                % loop over the line-sets
+                for lineSetID = 1:globalVarsMx.(['giftiFig', num2str(figNum)]).numLineSets
+                    selectedLineSetpoints = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(:, 1) == lineSetID, :);
+
+                    % loop over the points that are selected and need to be manipulated
+                    for iPoint = 1:size(selectedLineSetpoints, 1)
+                        pointIndex = selectedLineSetpoints(iPoint, 2);
+                        
+                        % move the line-set point data
+                        if selectedLineSetpoints(iPoint, 3) == 0
+                            globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID}(pointIndex, 1:3) = ...
+                                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID}(pointIndex, 1:3) + vecMove;
+                        else
+                            globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID}(pointIndex, 4:6) = ...
+                                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID}(pointIndex, 4:6) + vecMove;
+                        end
+                        
+                        % move the point that form the plotted line
+                        pPos = [globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPlot{lineSetID}{pointIndex}.XData', ...                        
+                                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPlot{lineSetID}{pointIndex}.YData', ...
+                                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPlot{lineSetID}{pointIndex}.ZData'];
+                        pPos(selectedLineSetpoints(iPoint, 3) + 1, :) = pPos(selectedLineSetpoints(iPoint, 3) + 1, :) + vecMove;       
+                        set(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPlot{lineSetID}{pointIndex}, ...
+                            'XData', pPos(:, 1), ...
+                            'YData', pPos(:, 2), ...
+                            'ZData', pPos(:, 3));
+                        
+                        % move the points that represent the line-set points
+                        if selectedLineSetpoints(iPoint, 3) == 1
+                            pointIndex = pointIndex + size(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID}, 1);
+                        end
+                        pPos = [globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}.XData', ...                        
+                                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}.YData', ...
+                                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}.ZData'];
+                        pPos(pointIndex, :) = pPos(pointIndex, :) + vecMove;
+                        set(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}, ...
+                            'XData', pPos(:, 1), ...
+                            'YData', pPos(:, 2), ...
+                            'ZData', pPos(:, 3));
+                        
+                    end
+                    
+                end
+                
             end
             
-            % check if the vertices are shown
-            if isfield(globalVarsMx.(['giftiFig', num2str(figNum)]), 'vertexPlot') && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot)
             
-                % move the plotted vertices that are involved in the selection (faces and seperate vertices)
-                pPos = [globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.XData', ...                        
-                        globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.YData', ...
-                        globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.ZData'];
-                pPos(movVertices, :) = pPos(movVertices, :) + vecMove;
-                set(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot, ...
-                    'XData', pPos(:, 1), ...
-                    'YData', pPos(:, 2), ...
-                    'ZData', pPos(:, 3));
+            %
+            % move vectices
+            %
+            if ~isempty(movVertices)
+                
+                % move the vertices
+                globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(movVertices, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices(movVertices, :) + vecMove;
+                globalVarsMx.(['giftiFig', num2str(figNum)]).baseVertices(movVertices, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).baseVertices(movVertices, :) + vecMove;
+                if isfield(globalVarsMx.(['giftiFig', num2str(figNum)]), 'secVertices')
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).secVertices(movVertices, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).secVertices(movVertices, :) + vecMove;
+                end
+
+                % check if the vertices are shown
+                if isfield(globalVarsMx.(['giftiFig', num2str(figNum)]), 'vertexPlot') && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot)
+
+                    % move the plotted vertices that are involved in the selection (faces and seperate vertices)
+                    pPos = [globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.XData', ...                        
+                            globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.YData', ...
+                            globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.ZData'];
+                    pPos(movVertices, :) = pPos(movVertices, :) + vecMove;
+                    set(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot, ...
+                        'XData', pPos(:, 1), ...
+                        'YData', pPos(:, 2), ...
+                        'ZData', pPos(:, 3));
+                end
+                
             end
-            
             
             % move the faces that indicate the selections
             for iFace = 1:size(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot, 1)    
-                globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{i, 1}.Vertices = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{iFace, 1}.Vertices + vecMove;
-                globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{i, 2}.Vertices = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{iFace, 2}.Vertices + vecMove;
+                globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{iFace, 1}.Vertices = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{iFace, 1}.Vertices + vecMove;
+                globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{iFace, 2}.Vertices = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedFacesPlot{iFace, 2}.Vertices + vecMove;
             end
 
             % update the geometry (only vertices)
@@ -2801,6 +2933,44 @@ function vertexPlotMouseDownFnc(~, hit, figNum)
         
         % pass to callback
         vertexClicked(figNum, selectedVertex);
+        
+    end    
+    
+    
+end
+
+function lineSetPointPlotMouseDownFnc(~, hit, figNum, lineSetID)
+    global globalVarsMx;
+
+    % check the mode
+    if globalVarsMx.(['giftiFig', num2str(figNum)]).mode == 0
+        % viewing
+        
+        
+    elseif globalVarsMx.(['giftiFig', num2str(figNum)]).mode == 1
+        % edit
+        
+        % retrieve the line-points
+        P = globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID};
+
+        % determine the point in the line-set closest to the click
+        P_long = [P(:,1:3); P(:,4:6)];
+        distances = sqrt(sum((P_long - hit.IntersectionPoint) .^ 2, 2));
+        [~, selectedPoint] = min(distances);
+        selectedPoint = P_long(selectedPoint, :);
+        clear P_long;
+
+        % find the point in the begin of the line segments (1:3) and end of the line segments (4:6)
+        p1 = find(all(P(:, 1:3) == selectedPoint, 2));
+        p2 = find(all(P(:, 4:6) == selectedPoint, 2));
+        
+        % pass to callback
+        for iPoint = 1:length(p1)
+            lineSetPointClicked(figNum, lineSetID, p1(iPoint), 0);
+        end
+        for iPoint = 1:length(p2)
+            lineSetPointClicked(figNum, lineSetID, p2(iPoint), 1);
+        end
         
     end    
     
@@ -3066,6 +3236,43 @@ function vertexClicked(figNum, vertexIndex)
         globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.CData(vertexIndex, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertexMarkerEdgeColor;
     else
         globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.CData(vertexIndex, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor;
+    end
+    
+end
+
+% callback on a line-set point being clicked (when in edit mode where points are shown)
+function lineSetPointClicked(figNum, lineSetID, pointIndex, p2)
+    global globalVarsMx;
+    
+    % see if the vertex was already selected
+    selected = [];
+    if ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints)
+    selected = find(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(:, 1) == lineSetID & ...
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(:, 2) == pointIndex & ...
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(:, 3) == p2, 1);
+    end
+    if isempty(selected)
+        % point is not selected
+        
+        globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(end + 1, :) = [lineSetID, pointIndex, p2];
+        selected = 1;
+        
+    else
+        % point is selected
+        
+        globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(selected, :) = [];
+        selected = 0;
+        
+    end
+     
+    % update the color properties of the selected line-set point
+    if p2 == 1
+        pointIndex = pointIndex + size(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID}, 1);
+    end
+    if selected
+        globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}.CData(pointIndex, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertexMarkerEdgeColor;
+    else
+        globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}.CData(pointIndex, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor;
     end
     
 end
@@ -3819,16 +4026,17 @@ function showVertices(figNum, show)
         
         % add to plot
         hold on;
-        globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot = scatter3( globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
-                                                                            V(:,1), ...
-                                                                            V(:,2), ...
-                                                                            V(:,3), ...
-                                                                            markerSize, ...
-                                                                            globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor, ...
-                                                                            'o', ...
-                                                                            'MarkerFaceColor', globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerFaceColor, ...
-                                                                            'lineWidth', 7.5);
-        
+        globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot = ...
+            scatter3(   globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
+                        V(:,1), ...
+                        V(:,2), ...
+                        V(:,3), ...
+                        markerSize, ...
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor, ...
+                        'o', ...
+                        'MarkerFaceColor', globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerFaceColor, ...
+                        'lineWidth', 7.5);
+
         % create and set the color data for the scatterplot (changed on selection)
         cData = repmat( globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor, ...
                         [length(globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot.XData) 1]);
@@ -3854,6 +4062,83 @@ function showVertices(figNum, show)
             globalVarsMx.(['giftiFig', num2str(figNum)]).vertexPlot = [];
             
         end
+        
+    end
+    
+end
+
+% function to show or hide the point that make up the lines in a line-set
+function showLinepoints(figNum, show)
+    global globalVarsMx;
+    
+    % check whether the line-points should be shown
+    if show == 1
+        
+        % loop over the line-sets
+        for lineSetID = 1:globalVarsMx.(['giftiFig', num2str(figNum)]).numLineSets
+            
+            % retrieve the line-points
+            P = globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID};
+            P = [P(:,1:3); P(:,4:6)];
+
+            % set the marker size
+            markerSize = 30;
+            %markerSize = 3 + globalVarsMx.(['giftiFig', num2str(figNum)]).edgeAverage * 5;
+
+            % add to plot
+            hold on;
+            globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID} = ...
+                scatter3(   globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, ...
+                            P(:, 1), ...
+                            P(:, 2), ...
+                            P(:, 3), ...
+                            markerSize, ...
+                            globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor, ...
+                            'o', ...
+                            'MarkerFaceColor', globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerFaceColor, ...
+                            'lineWidth', 7.5);
+
+            % create and set the color data for the scatterplot (changed on selection)
+            cData = repmat( globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor, ...
+                            [length(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}.XData) 1]);
+            if ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints)
+                selectedLineSetpoints = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(globalVarsMx.(['giftiFig', num2str(figNum)]).selectedLineSetpoints(:, 1) == lineSetID, :);
+                for iPoint = 1:size(selectedLineSetpoints, 1)
+                    pointIndex = selectedLineSetpoints(iPoint, 2);
+                    if selectedLineSetpoints(iPoint, 3) == 1
+                        pointIndex = pointIndex + size(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetData{lineSetID}, 1);
+                    end
+                    cData(pointIndex, :) = globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertexMarkerEdgeColor;
+                end
+            end
+            set(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}, 'CData', cData);
+
+            % 
+            hold off;
+            
+            % set the mousedown for the plot
+            set(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID}, 'ButtonDownFcn', {@lineSetPointPlotMouseDownFnc, figNum, lineSetID});
+            
+        end
+        
+    else
+        
+        % loop over the line-sets
+        for lineSetID = 1:globalVarsMx.(['giftiFig', num2str(figNum)]).numLineSets
+
+            % check if the line-set point plot exists
+            if isfield(globalVarsMx.(['giftiFig', num2str(figNum)]), 'lineSetPointPlot') && ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot)
+
+                % remove points from plot
+                delete(globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID});
+
+                % empty the handle
+                globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot{lineSetID} = [];
+
+            end
+            
+        end
+        globalVarsMx.(['giftiFig', num2str(figNum)]).lineSetPointPlot = {};
         
     end
     
