@@ -10,7 +10,7 @@
 %
 %   toolConfig                          = the configuration which is used to pass
 %                                         additional data and overlay information
-%   toolConfig.backgroundColor          = the background color of the window, as [R G B]
+%   toolConfig.windowBackgroundColor    = the background color of the window, as [R G B]
 %   toolConfig.secGifti                 = (optional) if a secondary gifti object is provided then the tools will allow morphing
 %   toolConfig.hideToolWindow           = (optional) whether the tool window should be hidden [0 or 1]
 %
@@ -28,9 +28,11 @@
 %   toolConfig.pointSet#PointMarker     = (optional) marker to be used for points (e.g. '*' will result in star markers)
 %   toolConfig.pointSet#PointLineWidth  = (optional) point line width
 %   toolConfig.pointSet#PointMarkerFaceColor = (optional) marker face color as [R G B] to be used for the pointset
-%   toolConfig.pointSet#DiskFloatFactor = (optional) set a float factor which will move the disks along their normal vector (towards or away from the surface)
+%   toolConfig.pointSet#DiskFloatFactor = (optional) set a float factor (only when using closest-face direction) which will move the 
+%                                         disks along their normal vector (towards or away from the surface)
 %   toolConfig.pointSet#DiskEdgeColor   = (optional) disk edge color (e.g. [0 0 1] will result in a blue border)
 %   toolConfig.pointSet#DiskEdgeWidth   = (optional) disk edge line width
+%   toolConfig.pointSet#DiskDirection   = (optional) the disk direction, 0 = use closest-face (ECoG), 1 = always face camera
 %   toolConfig.pointSet#WireSphereRad   = (optional) setting this value will enable the drawing a wire-sphere around each point; the
 %                                         given value here will define the sphere's radius
 %   toolConfig.pointSet#WireSphereCol   = (optional) color to be used for the wire-spheres (default will be the same as point color)
@@ -62,6 +64,8 @@
 %   toolConfig.vertexTextColor          = (optional) color to be used for the vertex texts (e.g. 'b' will result in blue text)
 %   toolConfig.vertexTextSize           = (optional) text size to be used for the vertex texts (e.g. '8' will result in text with a font size of 8)
 %
+%   toolConfig.defaultBackgroundColor   = (optional) the default background color of the brain object, as [R G B]
+%   toolConfig.defaultBackgroundAlpha   = (optional) the default background alpha of the brain object, value between 0 (transparent and 1 (opaque)
 %   toolConfig.background1              = (optional) background data. Input should be either a
 %                                         list of values (same length as vectices, or a matrix
 %                                         where the first column holds vertex indices
@@ -281,8 +285,10 @@ function giftiTools(input, toolConfig)
     globalVarsMx.(['giftiFig', num2str(figNum)]).faceCenters                    = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).faceNormals                    = [];
     globalVarsMx.(['giftiFig', num2str(figNum)]).vertexNormals                  = [];
-    globalVarsMx.(['giftiFig', num2str(figNum)]).backgroundColor                = [1, 1, 1];
+    globalVarsMx.(['giftiFig', num2str(figNum)]).windowBackgroundColor          = [1, 1, 1];
     globalVarsMx.(['giftiFig', num2str(figNum)]).wireframeColor                 = [0, 0, 0];
+    globalVarsMx.(['giftiFig', num2str(figNum)]).defaultBackgroundColor         = [0.83, 0.83, 0.83];
+    globalVarsMx.(['giftiFig', num2str(figNum)]).defaultBackgroundAlpha         = 1;
     globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerFaceColor          = [1, .6, .6];
     globalVarsMx.(['giftiFig', num2str(figNum)]).vertexMarkerEdgeColor          = [1, 0, 0];
     globalVarsMx.(['giftiFig', num2str(figNum)]).selectedVertexMarkerEdgeColor  = [0, 0, 1];
@@ -326,11 +332,11 @@ function giftiTools(input, toolConfig)
     globalVarsMx.(['giftiFig', num2str(figNum)]).showFaceAreas          = (isfield(toolConfig, 'showFaceAreas') && toolConfig.showFaceAreas == 1);
     globalVarsMx.(['giftiFig', num2str(figNum)]).showLinepoints         = (isfield(toolConfig, 'showLinepoints') && toolConfig.showLinepoints == 1);
     
-    if isfield(toolConfig, 'backgroundColor')
-        if isvector(toolConfig.backgroundColor) && length(toolConfig.backgroundColor) == 3
-            globalVarsMx.(['giftiFig', num2str(figNum)]).backgroundColor = toolConfig.backgroundColor;
+    if isfield(toolConfig, 'windowBackgroundColor')
+        if isvector(toolConfig.windowBackgroundColor) && length(toolConfig.windowBackgroundColor) == 3
+            globalVarsMx.(['giftiFig', num2str(figNum)]).windowBackgroundColor = toolConfig.windowBackgroundColor;
         else
-            fprintf(2, 'Warning: the backgroundColor argument is invalid, should be in the format of [R, G, B] with color values between 0 and 1 (e.g. [0 0 1])\n');
+            fprintf(2, 'Warning: the windowBackgroundColor argument is invalid, should be in the format of [R, G, B] with color values between 0 and 1 (e.g. [0 0 1])\n');
         end
     end
     if isfield(toolConfig, 'wireframeColor')
@@ -338,6 +344,20 @@ function giftiTools(input, toolConfig)
             globalVarsMx.(['giftiFig', num2str(figNum)]).wireframeColor = toolConfig.wireframeColor;
         else
             fprintf(2, 'Warning: the wireframeColor argument is invalid, should be in the format of [R, G, B] with color values between 0 and 1 (e.g. [0 0 1])\n');
+        end
+    end
+    if isfield(toolConfig, 'defaultBackgroundColor')
+        if isvector(toolConfig.defaultBackgroundColor) && length(toolConfig.defaultBackgroundColor) == 3
+            globalVarsMx.(['giftiFig', num2str(figNum)]).defaultBackgroundColor = toolConfig.defaultBackgroundColor;
+        else
+            fprintf(2, 'Warning: the defaultBackgroundColor argument is invalid, should be in the format of [R, G, B] with color values between 0 and 1 (e.g. [0 0 1])\n');
+        end
+    end
+    if isfield(toolConfig, 'defaultBackgroundAlpha')
+        if ~isnumeric(toolConfig.defaultBackgroundAlpha) || toolConfig.defaultBackgroundAlpha >= 0 || toolConfig.defaultBackgroundAlpha <= 1
+            globalVarsMx.(['giftiFig', num2str(figNum)]).defaultBackgroundAlpha = toolConfig.defaultBackgroundAlpha;
+        else
+            fprintf(2, 'Warning: the defaultBackgroundAlpha argument is invalid, should be in a value between 0 and 1\n');
         end
     end
     if isfield(toolConfig, 'vertexMarkerFaceColor') 
@@ -405,6 +425,7 @@ function giftiTools(input, toolConfig)
     % check, prepare and plot pointset data
     %%%
     globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData = {};
+    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetsToUpdateWithCamera = [];
     pointsetCounter = 1;
     for pointSetID = 1:globalVarsMx.(['giftiFig', num2str(figNum)]).maxPointSets
         
@@ -448,8 +469,9 @@ function giftiTools(input, toolConfig)
             globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeWidth{pointsetCounter} = 1;
             if isfield(toolConfig, ['pointSet', num2str(pointSetID), 'DiskEdgeWidth'])
                 globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeWidth{pointsetCounter} = toolConfig.(['pointSet', num2str(pointSetID), 'DiskEdgeWidth']);
-            end
-			
+            end            
+            globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskDirection{pointsetCounter} = (isfield(toolConfig, ['pointSet', num2str(pointSetID), 'DiskDirection']) && toolConfig.(['pointSet', num2str(pointSetID), 'DiskDirection']) == 1);
+            
             
             %
             % colors
@@ -650,19 +672,37 @@ function giftiTools(input, toolConfig)
                 % type disks
 
                 % store the type
-                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetType{pointsetCounter} = 'disks';
+                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetType{pointsetCounter} = 1;
+                
+                % check if the direction of the disc depends on the closest-face (ECoG-like)
+                if globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskDirection{pointsetCounter} == 0
+                
+                    % make sure the point normals are available (either by projection onto hull, or by dora's method)
+                    checkPointsNormals(figNum, pointsetCounter);
 
-                % make sure the point normals are available (either by projection onto hull, or by dora's method)
-                checkPointsNormals(figNum, pointsetCounter);
-                
-                % retrieve the point normals
-                pointNormals = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetNormals{pointsetCounter};
-                
-                % determine the rotation matrices for each triangle
-                u = [zeros(size(pointNormals, 1), 1), -pointNormals(:, 3), pointNormals(:, 2)];
-                u = u ./ vecnorm(u')';
-                trRotMat = cat(3, cross(u, pointNormals, 2), u, pointNormals);
-                trRotMat = permute(trRotMat, [1 3 2]);
+                    % retrieve the point normals
+                    pointNormals = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetNormals{pointsetCounter};
+
+                    % determine the rotation matrices for each triangle
+                    u = [zeros(size(pointNormals, 1), 1), -pointNormals(:, 3), pointNormals(:, 2)];
+                    u = u ./ vecnorm(u')';
+                    trRotMat = cat(3, cross(u, pointNormals, 2), u, pointNormals);
+                    trRotMat = permute(trRotMat, [1 3 2]);
+                    
+                else
+                    % face camera
+                    
+                    % register pointset to be updaten upon camera rotation
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetsToUpdateWithCamera(end + 1) = pointsetCounter;
+
+                    % determine the rotation matrix to have each point face the camera
+                    pointNormal = toolConfig.camTarget - toolConfig.camPos;
+                    pointNormal = pointNormal / norm(pointNormal);
+                    u = [0, -pointNormal(3), pointNormal(2)];
+                    u = u / norm(u);
+                    trRotMat = [cross(u, pointNormal); u; pointNormal];
+
+                end
                 
                 % disk constants
                 diskPointsPerCircle = 30;         % number of points per disk
@@ -674,20 +714,41 @@ function giftiTools(input, toolConfig)
                 hold on;
                 points = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointsetCounter};
                 globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter} = [];
+                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisksVertices{pointsetCounter} = [];
                 numPoints = size(points, 1);
                 for iPoint = 1:numPoints
                     
                     % copy the base disk
                     cDisk = baseDisk;
                     
-                    % rotate the disk
-                    cDisk = (cDisk' * squeeze(trRotMat(iPoint, :, :)))';
-                    
-                    % position the disk (project)
-                    cDisk(1, :) = cDisk(1, :) + points(iPoint, 1) + pointNormals(iPoint, 1) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
-                    cDisk(2, :) = cDisk(2, :) + points(iPoint, 2) + pointNormals(iPoint, 2) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
-                    cDisk(3, :) = cDisk(3, :) + points(iPoint, 3) + pointNormals(iPoint, 3) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
+                    % store the base disk coordinates (so they can be re-used upon camera changes to 
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisksVertices{pointsetCounter}{end + 1} = cDisk;
 
+                    % check if the direction of the disc depends on the closest-face (ECoG-like)
+                    if globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskDirection{pointsetCounter} == 0
+                        
+                        % rotate the disk
+                        cDisk = (cDisk' * squeeze(trRotMat(iPoint, :, :)))';
+
+                        % position the disk (project)
+                        cDisk = cDisk + points(iPoint, :)' + (pointNormals(iPoint, 1)' * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter});
+                        %cDisk(1, :) = cDisk(1, :) + points(iPoint, 1) + pointNormals(iPoint, 1) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
+                        %cDisk(2, :) = cDisk(2, :) + points(iPoint, 2) + pointNormals(iPoint, 2) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
+                        %cDisk(3, :) = cDisk(3, :) + points(iPoint, 3) + pointNormals(iPoint, 3) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
+
+                    else
+                        
+                        % rotate the disk
+                        cDisk = (cDisk' * trRotMat)';
+                        
+                        % position the disk
+                        cDisk = cDisk + points(iPoint, :)';
+                        %cDisk(1, :) = cDisk(1, :) + points(iPoint, 1);
+                        %cDisk(2, :) = cDisk(2, :) + points(iPoint, 2);
+                        %cDisk(3, :) = cDisk(3, :) + points(iPoint, 3);
+                        
+                    end
+                    
                     % check if is a colormap and there are values that should be used to determine the color
                     if ~isempty(pointSetColormap) && ~isempty(colors)
                         color = colors(iPoint, :);
@@ -700,16 +761,16 @@ function giftiTools(input, toolConfig)
                         %  FaceAlpha, allowing matlab drawing routines (instead of OpenGL) and smooth lines)
                         
                         % add disk as line
-                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end + 1) = ...
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}{end + 1} = ...
                             plot3(cDisk(1, :), cDisk(2, :), cDisk(3, :), ...
                             'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeColor{pointsetCounter}, ...
                             'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeWidth{pointsetCounter} );
                         
                     else
                         % solid color or alpha > 0 in middle
-
+                        
                         % add disk patch
-                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end + 1) = ...
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}{end + 1} = ...
                             patch(cDisk(1, :), cDisk(2, :), cDisk(3, :), color(1:3), ...
                             'EdgeColor', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeColor{pointsetCounter}, ...
                             'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeWidth{pointsetCounter} );
@@ -720,13 +781,13 @@ function giftiTools(input, toolConfig)
                             %       no anti-aliasing; this is because the opengl renderer is used for transparency and for
                             %       some reason Matlab does not allow it to draw properly; otherwise the matlab
                             %       renderer is used, which cannot do transparency but can draw smoother edges
-                            set(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end), 'FaceAlpha', color(4));
+                            set(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}{end}, 'FaceAlpha', color(4));
                         end
 
                     end
                     
                     % set material to full ambient, no diffuse and no specular
-                    material(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end), [1, 0.0, 0.0]);
+                    material(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}{end}, [1, 0.0, 0.0]);
                     
                 end
                 hold off;
@@ -735,7 +796,7 @@ function giftiTools(input, toolConfig)
                 % type points
                 
                 % store the type
-                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetType{pointsetCounter} = 'points';
+                globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetType{pointsetCounter} = 0;
                 
                 % start plotting
                 hold on;
@@ -1399,7 +1460,7 @@ function giftiTools(input, toolConfig)
     
     
     %%%
-    % check and prepare background data
+    % check and prepare brain background data
     %%%
 
     % loop through the background data
@@ -2147,7 +2208,7 @@ function giftiTools(input, toolConfig)
     set(globalVarsMx.(['giftiFig', num2str(figNum)]).figHandle, 'ToolBar', 'none');
 
     % set the background color
-    set(globalVarsMx.(['giftiFig', num2str(figNum)]).figHandle, 'color', globalVarsMx.(['giftiFig', num2str(figNum)]).backgroundColor);
+    set(globalVarsMx.(['giftiFig', num2str(figNum)]).figHandle, 'color', globalVarsMx.(['giftiFig', num2str(figNum)]).windowBackgroundColor);
     
     % set the standard lighting and material properties
     lighting(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, 'gouraud');
@@ -2820,7 +2881,7 @@ function patchMouseDownFnc(~, hit, figNum)
             camtarget(hit.IntersectionPoint);
 
             % yoke propegate the camera position
-            yokePropegateCam(figNum);
+            yokePropegateCam(figNum, 0);
 
         end
         
@@ -3015,7 +3076,7 @@ function mouseScrollFnc(~, event, figNum)
         camva(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, globalVarsMx.(['giftiFig', num2str(figNum)]).cameraVA);
 
         % yoke propegate the zoom
-        yokePropegateZoom(figNum);
+        yokePropegateCam(figNum, 1);
         
     end
     
@@ -3023,7 +3084,7 @@ end
 
 function mouseDownFnc(src, ~, figNum)
     global globalVarsMx;
-
+    
     % check if in viewing mode
     if globalVarsMx.(['giftiFig', num2str(figNum)]).mode == 0
 
@@ -3095,12 +3156,11 @@ function mouseMoveTransFnc(~, event, figNum)
     % move the camera and target
     camdolly(-ptDiff(1) / 100, -ptDiff(2) / 100, 0, 'movetarget');
     
-    % delete and recreate the light at the camera position
-    delete(globalVarsMx.(['giftiFig', num2str(figNum)]).cameraLight);
-    globalVarsMx.(['giftiFig', num2str(figNum)]).cameraLight = camlight(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, 'headlight');
+    % update only the light
+    camUpdate(figNum, 1, 0);
     
     % yoke propegate the camera position
-    yokePropegateCam(figNum);
+    yokePropegateCam(figNum, 0);
     
 end
 
@@ -3117,12 +3177,11 @@ function mouseMoveRotateFnc(~, event, figNum)
     % rotate the camera
     camorbit(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, -ptDiff(1), -ptDiff(2));
     
-    % delete and recreate the light at the camera position
-    delete(globalVarsMx.(['giftiFig', num2str(figNum)]).cameraLight);
-    globalVarsMx.(['giftiFig', num2str(figNum)]).cameraLight = camlight(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, 'headlight');
+    % update the light and 3D elements (e.g. disks that face the camera)
+    camUpdate(figNum, 1, 1);
     
     % yoke propegate the camera position
-    yokePropegateCam(figNum);
+    yokePropegateCam(figNum, 0);
     
 end
 
@@ -3146,7 +3205,7 @@ function mouseMoveZoomFnc(~, event, figNum)
     camva(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, globalVarsMx.(['giftiFig', num2str(figNum)]).cameraVA);
     
     % yoke propegate the zoom
-    yokePropegateZoom(figNum);
+    yokePropegateCam(figNum, 1);
     
 end
 
@@ -3164,32 +3223,114 @@ function mouseUpFnc(~, ~, figNum)
     
 end
 
-function yokePropegateCam(figNum)
+% function to update the light and 3D elements (e.g. disks to face the camera) after an update of the camera
+function camUpdate(figNum, updateLight, update3DElements)
+    global globalVarsMx;
+
+    % 
+    if update3DElements == 1
+        if ~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetsToUpdateWithCamera)
+
+            % determine 
+            pointNormal = camtarget(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle) - campos(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
+            pointNormal = pointNormal / norm(pointNormal);
+
+            % calculate the rotation matrix
+            u = [0, -pointNormal(3), pointNormal(2)];
+            u = u / norm(u);
+            trRotMat = [cross(u, pointNormal); u; pointNormal];
+
+            % loop through the disk point-sets that need to be updated with camera movement
+            for pointSetID = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetsToUpdateWithCamera
+
+                % 
+                if  globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetType{pointSetID} == 1 && ...
+                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskDirection{pointSetID} == 1
+                    % disks that need to face camera
+
+                    % retrieve the point positions
+                    points = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetData{pointSetID};
+
+                    % loop over the disks
+                    numDisks = length(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointSetID});
+                    for iDisk = 1:numDisks
+
+                        diskVertices = globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisksVertices{pointSetID}{iDisk};
+
+                        % rotate the disk vertices
+                        diskVertices = (diskVertices' * trRotMat)';
+
+                        % position the disk (project)
+                        diskVertices = diskVertices + points(iDisk, :)';
+
+                        % update their orientation (to face the camera)
+                        set(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointSetID}{iDisk}, 'Vertices', diskVertices');
+                    end
+
+
+                end
+
+            end
+            
+        end
+    end
+    
+    % 
+    if updateLight == 1
+
+        % update the light at the camera position (should do the same as headlight)
+        set(globalVarsMx.(['giftiFig', num2str(figNum)]).cameraLight, 'Position', campos(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle));
+        %delete(globalVarsMx.(['giftiFig', num2str(figNum)]).cameraLight);
+        %globalVarsMx.(['giftiFig', num2str(figNum)]).cameraLight = camlight(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle, 'headlight');
+        
+    end
+    
+end
+
+
+function yokePropegateCam(figNum, zoomOnly)
     global globalVarsMx;
     
     % check if other displays (axis) should be adjusted)
     if (~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).yokeCam) && globalVarsMx.(['giftiFig', num2str(figNum)]).yokeCam == 1) && length(globalVarsMx.giftiYoke) > 1
         
-        % retrieve the pos/target and up vectors from the current display
-        newCamPos = campos(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
-        newCamTarget = camtarget(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
-        newCamUp = camup(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
+        if zoomOnly == 1
+
+            % retrieve the viewangle from the current display
+            newCamVa = camva(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
+
+        else            
+
+            % retrieve the pos/target and up vectors from the current display
+            newCamPos = campos(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
+            newCamTarget = camtarget(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
+            newCamUp = camup(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
+
+        end
         
         % loop through the yoke displays
         for iYoke = 1:length(globalVarsMx.giftiYoke)
             
             % check if the display is not this one
             if globalVarsMx.giftiYoke{iYoke} ~= figNum
-                
-                % set the new camera position
-                campos(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamPos);
-                camtarget(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamTarget);
-                camup(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamUp);
-    
-                % delete and recreate the light at the camera position
-                delete(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).cameraLight);
-                globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).cameraLight = camlight(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, 'headlight');
-                
+                if zoomOnly == 1
+
+                    % set the new camera position
+                    camva(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamVa);
+                    globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).cameraVA = newCamVa;
+                    
+                else
+                    
+                    % set the new camera position
+                    campos(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamPos);
+                    camtarget(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamTarget);
+                    camup(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamUp);
+                    
+                    % update the light and 3D elements (e.g. disks that face the camera)
+                    camUpdate(globalVarsMx.giftiYoke{iYoke}, 1, 1);
+
+                end
+
             end
              
         end
@@ -3197,34 +3338,6 @@ function yokePropegateCam(figNum)
     end
     
 end
-
-function yokePropegateZoom(figNum)
-    global globalVarsMx;
-    
-    % check if other displays (axis) should be adjusted)
-    if (~isempty(globalVarsMx.(['giftiFig', num2str(figNum)]).yokeCam) && globalVarsMx.(['giftiFig', num2str(figNum)]).yokeCam == 1) && length(globalVarsMx.giftiYoke) > 1
-        
-        % retrieve the viewangle from the current display
-        newCamVa = camva(globalVarsMx.(['giftiFig', num2str(figNum)]).axisHandle);
-        
-        % loop through the yoke displays
-        for iYoke = 1:length(globalVarsMx.giftiYoke)
-            
-            % check if the display is not this one
-            if globalVarsMx.giftiYoke{iYoke} ~= figNum
-                
-                % set the new camera position
-                camva(globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).axisHandle, newCamVa);
-                globalVarsMx.(['giftiFig', num2str(globalVarsMx.giftiYoke{iYoke})]).cameraVA = newCamVa;
-                
-            end
-             
-        end
-        
-    end
-    
-end
-
 
 
 %%%
@@ -4258,7 +4371,10 @@ function updateColoring(figNum)
     % apply to the figure
     set(globalVarsMx.(  ['giftiFig', num2str(figNum)]).patchHandle, ...
                         'FaceColor', 'interp', ...
-                        'FaceVertexCData', globalVarsMx.(['giftiFig', num2str(figNum)]).displayColors)
+                        'FaceVertexCData', globalVarsMx.(['giftiFig', num2str(figNum)]).displayColors);
+    
+    set(globalVarsMx.(  ['giftiFig', num2str(figNum)]).patchHandle, ...
+                        'FaceAlpha', globalVarsMx.(['giftiFig', num2str(figNum)]).defaultBackgroundAlpha);
     
 end
 
@@ -4454,8 +4570,9 @@ end
 function buildColoring(figNum, addOverlays)
     global globalVarsMx;
     
+    %defaultBackgroundColor
     % apply a grey base color
-    globalVarsMx.(['giftiFig', num2str(figNum)]).displayColors = 0.83 + zeros(size(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices, 1), 3);
+    globalVarsMx.(['giftiFig', num2str(figNum)]).displayColors = globalVarsMx.(['giftiFig', num2str(figNum)]).defaultBackgroundColor + zeros(size(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices, 1), 3);
     
     % check if overlays should be drawn
     if addOverlays == 1
