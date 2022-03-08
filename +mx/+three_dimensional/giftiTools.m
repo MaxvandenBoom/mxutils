@@ -122,7 +122,7 @@
 %    
 %     'Red' 'Blue' 'Green'
 %     'Violet' 'Yellow' 'Cyan' 'Orange' 'Grey'
-%     'Hot_0' 'Winter' 'Jet' 'Parula' 
+%     'Hot_0' 'Winter' 'Jet' 'Parula' 'cm_angle' 'cm_eccen' 'RedWhiteBlue'
 % 
 %
 %   Controls:
@@ -687,21 +687,42 @@ function giftiTools(input, toolConfig)
                     cDisk(1, :) = cDisk(1, :) + points(iPoint, 1) + pointNormals(iPoint, 1) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
                     cDisk(2, :) = cDisk(2, :) + points(iPoint, 2) + pointNormals(iPoint, 2) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
                     cDisk(3, :) = cDisk(3, :) + points(iPoint, 3) + pointNormals(iPoint, 3) * globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskFloatFactor{pointsetCounter};
-                    
+
                     % check if is a colormap and there are values that should be used to determine the color
                     if ~isempty(pointSetColormap) && ~isempty(colors)
                         color = colors(iPoint, :);
                     end
                     
-                    % add disk patch
-                    globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end + 1) = ...
-                        patch(cDisk(1, :), cDisk(2, :), cDisk(3, :), color(1:3), ...
-                        'EdgeColor', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeColor{pointsetCounter}, ...
-                        'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeWidth{pointsetCounter} );
-                    
-                    % set face transparancy
-                    if length(color) > 3
-                        set(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end), 'FaceAlpha', color(4));
+                    % check if the disk is explicitely set to have a completely transparent inside
+                    if length(color) > 3 && color(4) == 0
+                        % only outline of disk
+                        % (this will allow a transparent inside of the disk while not setting a
+                        %  FaceAlpha, allowing matlab drawing routines (instead of OpenGL) and smooth lines)
+                        
+                        % add disk as line
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end + 1) = ...
+                            plot3(cDisk(1, :), cDisk(2, :), cDisk(3, :), ...
+                            'Color', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeColor{pointsetCounter}, ...
+                            'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeWidth{pointsetCounter} );
+                        
+                    else
+                        % solid color or alpha > 0 in middle
+
+                        % add disk patch
+                        globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end + 1) = ...
+                            patch(cDisk(1, :), cDisk(2, :), cDisk(3, :), color(1:3), ...
+                            'EdgeColor', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeColor{pointsetCounter}, ...
+                            'LineWidth', globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDiskEdgeWidth{pointsetCounter} );
+
+                        % set face transparancy (if there is an alpha value above 0
+                        if length(color) > 3 && color(4) > 0
+                            % note: setting transparency will cause ragged edges/less smooth lines similar to
+                            %       no anti-aliasing; this is because the opengl renderer is used for transparency and for
+                            %       some reason Matlab does not allow it to draw properly; otherwise the matlab
+                            %       renderer is used, which cannot do transparency but can draw smoother edges
+                            set(globalVarsMx.(['giftiFig', num2str(figNum)]).pointSetDisks{pointsetCounter}(end), 'FaceAlpha', color(4));
+                        end
+
                     end
                     
                     % set material to full ambient, no diffuse and no specular
@@ -2003,7 +2024,7 @@ function giftiTools(input, toolConfig)
                                             'Position', getTDPos(figNum, 10, ctrlY + 2, 100, 30), ...
                                             'String', 'Cut X', ...
                                             'FontSize', 8, 'HorizontalAlignment', 'left', ...
-                                            'Callback', {@btnCut, 0, figNum});                                     
+                                            'Callback', {@btnCut, 0, figNum});
         globalVarsMx.(['giftiFig', num2str(figNum)]).btnCutY = uicontrol(   globalVarsMx.(['giftiFig', num2str(figNum)]).thisFig, ...
                                             'Style', 'pushbutton', 'Units', 'pixels', ...
                                             'Position', getTDPos(figNum, 125, ctrlY + 2, 100, 30), ...
@@ -4268,65 +4289,68 @@ function defineColormaps(figNum)
 
     %
     globalVarsMx.(['giftiFig', num2str(figNum)]).colormaps = {
-                                'Red',        {[0.3 0 0
-                                                0.4 0 0
-                                                0.5 0 0
-                                                0.6 0 0
-                                                0.8 0 0
-                                                1.0 0 0]}; ...
-                                'Blue',       {[0 0 0.3
-                                                0 0 0.4
-                                                0 0 0.5
-                                                0 0 0.6
-                                                0 0 0.8
-                                                0 0 1.0]}; ...
-                                'Green',      {[0 0.3 0
-                                                0 0.4 0
-                                                0 0.5 0
-                                                0 0.6 0
-                                                0 0.8 0
-                                                0 1.0 0]}; ...
-                                'Violet',     {[0.3 0 0.3
-                                                0.4 0 0.4
-                                                0.5 0 0.5
-                                                0.6 0 0.6
-                                                0.8 0 0.8
-                                                1.0 0 1.0]}; ...
-                                'Yellow',     {[0.3 0.3 0
-                                                0.4 0.4 0
-                                                0.5 0.5 0
-                                                0.6 0.6 0
-                                                0.8 0.8 0
-                                                1.0 1.0 0]}; ...
-                                'Cyan',       {[0 0.3 0.3
-                                                0 0.4 0.4
-                                                0 0.5 0.5
-                                                0 0.6 0.6
-                                                0 0.8 0.8
-                                                0 1.0 1.0]}; ...
-                                'Orange',     {[1.0 0.7  0.0
-                                                1.0 0.78 0.04
-                                                1.0 0.85 0.4]}; ...
-                                'Hot_0',      {[   0    0    0
-                                                   0.33 0    0
-                                                   0.66 0    0
-                                                   1    0    0
-                                                   1    0.25 0
-                                                   1    0.50 0
-                                                   1    0.75 0
-                                                   1    1    0
-                                                   1    1    0.33
-                                                   1    1    0.66
-                                                   1    1    1     ]}; ...
-                                'Hot',        {hot}; ...
-                                'Winter',     {winter}; ...
-                                'Jet',        {jet}; ...
-                                'Parula',     {parula}; ...
-                                'Grey',       {gray}; ...
+                                'Red',          {[0.3 0 0
+                                                  0.4 0 0
+                                                  0.5 0 0
+                                                  0.6 0 0
+                                                  0.8 0 0
+                                                  1.0 0 0]}; ...
+                                'Blue',         {[0 0 0.3
+                                                  0 0 0.4
+                                                  0 0 0.5
+                                                  0 0 0.6
+                                                  0 0 0.8
+                                                  0 0 1.0]}; ...
+                                'Green',        {[0 0.3 0
+                                                  0 0.4 0
+                                                  0 0.5 0
+                                                  0 0.6 0
+                                                  0 0.8 0
+                                                  0 1.0 0]}; ...
+                                'Violet',       {[0.3 0 0.3
+                                                  0.4 0 0.4
+                                                  0.5 0 0.5
+                                                  0.6 0 0.6
+                                                  0.8 0 0.8
+                                                  1.0 0 1.0]}; ...
+                                'Yellow',       {[0.3 0.3 0
+                                                  0.4 0.4 0
+                                                  0.5 0.5 0
+                                                  0.6 0.6 0
+                                                  0.8 0.8 0
+                                                  1.0 1.0 0]}; ...
+                                'Cyan',         {[0 0.3 0.3
+                                                  0 0.4 0.4
+                                                  0 0.5 0.5
+                                                  0 0.6 0.6
+                                                  0 0.8 0.8
+                                                  0 1.0 1.0]}; ...
+                                'Orange',       {[1.0 0.7  0.0
+                                                  1.0 0.78 0.04
+                                                  1.0 0.85 0.4]}; ...
+                                'Hot_0',        {[   0    0    0
+                                                     0.33 0    0
+                                                     0.66 0    0
+                                                     1    0    0
+                                                     1    0.25 0
+                                                     1    0.50 0
+                                                     1    0.75 0
+                                                     1    1    0
+                                                     1    1    0.33
+                                                     1    1    0.66
+                                                     1    1    1     ]}; ...
+                                'Hot',          {hot}; ...
+                                'Winter',       {winter}; ...
+                                'Jet',          {jet}; ...
+                                'Parula',       {parula}; ...
+                                'Grey',         {gray}; ...
                                 'cm_angle',     {cm_angle}; ...
                                 'cm_eccen',     {cm_eccen}; ...
-                                
+                                'RedWhiteBlue', {[0    0    0.99
+                                                  0.99 0.99 0.99
+                                                  0.99 0    0    ]}; ...                                
                              };
+                         
 end
 
 
@@ -4431,7 +4455,7 @@ function buildColoring(figNum, addOverlays)
     global globalVarsMx;
     
     % apply a grey base color
-    globalVarsMx.(['giftiFig', num2str(figNum)]).displayColors = 0.7 + zeros(size(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices, 1), 3);
+    globalVarsMx.(['giftiFig', num2str(figNum)]).displayColors = 0.83 + zeros(size(globalVarsMx.(['giftiFig', num2str(figNum)]).displayVertices, 1), 3);
     
     % check if overlays should be drawn
     if addOverlays == 1
@@ -5056,7 +5080,6 @@ function [outDistances, P, outTriangles, outNormals] = closestFace(faces, vertic
     pd_vertices = [];
     validVertices = [];
     for iPoint = 1:length(I)
-        closerVertices = [];
         
         % calculate the distance between the points and all vertices
         if isempty(pd_vertices)
@@ -5077,7 +5100,7 @@ function [outDistances, P, outTriangles, outNormals] = closestFace(faces, vertic
         closerVertices = find(closerVertices);
         closerVertices(~validVertices(closerVertices)) = [];
         
-        % check which point found no matching triangle
+        % check if the point found no matching triangle
         % or whether there are closer vertices than those of the found triangle
         distValues = sub2ind(size(D), I, ones(length(I), 1), (1:length(I))');
         if isnan(D(distValues(iPoint))) || ~isempty(closerVertices)
@@ -5095,7 +5118,11 @@ function [outDistances, P, outTriangles, outNormals] = closestFace(faces, vertic
             % overwrite
             outDistances(iPoint) = nan;
             P(iPoint, :) = [nan, nan, nan];
-            outTriangles(iPoint) = closestTriangles(1);
+            if isempty(closestTriangles)
+                outTriangles(iPoint) = nan;       % this point is 
+            else
+                outTriangles(iPoint) = closestTriangles(1);
+            end
             outNormals(iPoint, :) = normalAverage;
             
         end
