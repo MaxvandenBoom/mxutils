@@ -1,7 +1,7 @@
 %	
 %   Merge multiple giftis together into one mesh
 %
-%   [vertexMatrix, facesMatrix, vertexConversion] = merge3DObjects(gifti1, gifti2, ...)
+%   [vertexMatrix, facesMatrix] = merge3DObjects(gifti1, gifti2, ...)
 %
 %   gifti#          = the input giftis to merge
 %

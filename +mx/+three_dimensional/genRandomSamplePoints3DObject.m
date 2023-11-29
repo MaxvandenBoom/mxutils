@@ -5,11 +5,13 @@
 %       obj3D           = the 3D object onto which the vertices are projected
 %       numSamples      = the number of 3D sample pont to be generated
 %
+%
 %   Returns: 
 %       samplePoints    = The random 3D sample points
 %       sampleTriangles = The triangles to which each 3D sample point belongs
 %
-%   Copyright (C) 2019 Max van den Boom
+%
+%   Copyright 2019, Max van den Boom
 
 %   This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
 %   as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -95,8 +97,7 @@ function [samplePoints, sampleTriangles] = genRandomSamplePoints3DObject(obj3D, 
     % However, given the precision of rand, the bias on not-selection of the 
     % first or last triangle is neglectable)
     sampleTriangles = rand(1, numSamples) * cumAreas(end);
-
-
+	
     % determine which triangle based on the random (area) value
     inTriangle = (sampleTriangles >= [0; cumAreas(1:end - 1)] & sampleTriangles < cumAreas);
     [sampleTriangles, ~] = find(inTriangle == 1);
@@ -109,7 +110,7 @@ function [samplePoints, sampleTriangles] = genRandomSamplePoints3DObject(obj3D, 
         fprintf(2, 'Warning: random drawn triangles not equal to number of expected samples, debug\n');
     end
 
-    
+
     %
     % generate a sample-list with random barycentric coordinates
     %

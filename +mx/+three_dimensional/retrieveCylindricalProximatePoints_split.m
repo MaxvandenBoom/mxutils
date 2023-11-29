@@ -4,38 +4,30 @@
 %
 %   [proximatePoints, distOnAxis, distFromAxis] = retrieveRadialProximatePoints(retrievalPoints, searchPoints, radius, splitConfig, [usePreExclusion])
 %
-%   retrievalPoints = the points in 3D space (n-by-3 matrix) which are being searched in (to be retrieved)
-%   searchCylinders = the cylinders in 3D space (n-by-6 matrix), where each row defines a cylinder within which to search
-%   radius          = the radius of the cylinders from which a retrieval point will be considered close
-%   usePreExclusion = [optional, 0 or 1; default = 1) perform pre-exclusion of retrieval-points for each cylinder based on
-%                     a search radius. This is beneficial when with a larger number of retrieval-points/search-cylinders, 
-%                     and/or when limited memory is available; for smaller numbers of retrieval-points and search-cylinders, set
-%                     this parameter to 0 
+%   	retrievalPoints 	  = the points in 3D space (n-by-3 matrix) which are being searched in (to be retrieved)
+%   	searchCylinders 	  = the cylinders in 3D space (n-by-6 matrix), where each row defines a cylinder within which to search
+%   	radius          	  = the radius of the cylinders from which a retrieval point will be considered close
+%   	usePreExclusion 	  = [optional, 0 or 1; default = 1) perform pre-exclusion of retrieval-points for each cylinder based on
+%       	              	    a search radius. This is beneficial when with a larger number of retrieval-points/search-cylinders, 
+%           	          		and/or when limited memory is available; for smaller numbers of retrieval-points and search-cylinders, set
+%               	      		this parameter to 0 
 % 
-%   splitConfig           = the configuration on splitting the input
-%   splitConfig.numSets   = (optional) split input into x sets of 3D-points [0 = no splitting into sets]
-%   splitConfig.numPoints = (optional) splits the input in sets of x 3D-points [0 = no splitting into sets]
-%   splitConfig.threads   = (optional) number of threads to run the sets on (requires the
-%                           set to be split using either numSets or numPoints)
+%   	splitConfig           = the configuration on splitting the input
+%   	splitConfig.numSets   = (optional) split input into x sets of 3D-points [0 = no splitting into sets]
+%   	splitConfig.numPoints = (optional) splits the input in sets of x 3D-points [0 = no splitting into sets]
+%   	splitConfig.threads   = (optional) number of threads to run the sets on (requires the set to be split using either numSets or numPoints)
 %
 %   
 %   Returns: 
-%       proximatePoints   = cell array. Each cell represents an (input)
-%                           cylinder, the values in the cell are the indices
-%                           of the (input) retrieval points which are within
-%                           the search cylinder's radius
-%       distOnAxis        = cell array. Each cell represents an (input)
-%                           cylinder, the values in the cell are the distances
-%                           of the retrieval points on the cylinder axis. So
-%                           the distance to the start cap point (first three
-%                           columns in the searchCylinder parameters) if the point
-%                           would be projected by the shortest distance onto the axis
-%       distFromAxis      = cell array. Each cell represents an (input)
-%                           cylinder, the values in the cell are the distances
-%                           of the retrieval points to the cylinder axis. So
-%                           the shortest distance of the point to the axis
+%       proximatePoints       = cell array. Each cell represents an (input) cylinder, the values in the cell are the indices
+%                               of the (input) retrieval points which are within the search cylinder's radius
+%       distOnAxis            = cell array. Each cell represents an (input) cylinder, the values in the cell are the distances
+%                               of the retrieval points on the cylinder axis. So the distance to the start cap point (first three
+%                               columns in the searchCylinder parameters) if the point would be projected by the shortest distance onto the axis
+%       distFromAxis          = cell array. Each cell represents an (input) cylinder, the values in the cell are the distances
+%                               of the retrieval points to the cylinder axis. So the shortest distance of the point to the axis
 %
-%   Copyright (c) 2019, Max van den Boom
+%   Copyright 2019, Max van den Boom
 
 %   This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
 %   as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -61,18 +53,18 @@ function [proximatePoints, distOnAxis, distFromAxis] = retrieveCylindricalProxim
     % return if there are no cylinders to process
     if totalCylinder == 0, return; end
     
-    %%%
-    %% split
-    %%%
+    %%
+    % split
+    %
     [retVal, splitConfig, numSets, ~, ranges] = mx.misc.prepareSplitProcessing(totalCylinder, splitConfig);
     if retVal == 0
         return;
     end
     
     
-    %%%
-    %% function
-    %%%
+    %%
+    % function
+    %
         
     % create the variable to store the cumulated results
     setCylinders = cell(numSets, 1);

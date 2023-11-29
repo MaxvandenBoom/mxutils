@@ -4,24 +4,22 @@
 %
 %   [proximatePoints] = retrieveRadialProximatePoints(retrievalPoints, searchPoints, radius, splitConfig)
 %
-%   retrievalPoints       = the points in 3D space (n-by-3 matrix) which are being searched in (to be retrieved)
-%   searchPoints          = the points in 3D space (n-by-3 matrix), where each point is a source in space from which to search
-%   radius                = the radius within each search point where a retrieval point will be considered close    
+%   	retrievalPoints       = the points in 3D space (n-by-3 matrix) which are being searched in (to be retrieved)
+%   	searchPoints          = the points in 3D space (n-by-3 matrix), where each point is a source in space from which to search
+%   	radius                = the radius within each search point where a retrieval point will be considered close    
 % 
-%   splitConfig           = the configuration on splitting the input
-%   splitConfig.numSets   = (optional) split input into x sets of 3D-points [0 = no splitting into sets]
-%   splitConfig.numPoints = (optional) splits the input in sets of x 3D-points [0 = no splitting into sets]
-%   splitConfig.threads   = (optional) number of threads to run the sets on (requires the
-%                           set to be split using either numSets or numPoints)
+%   	splitConfig           = the configuration on splitting the input
+%   	splitConfig.numSets   = (optional) split input into x sets of 3D-points [0 = no splitting into sets]
+%   	splitConfig.numPoints = (optional) splits the input in sets of x 3D-points [0 = no splitting into sets]
+%   	splitConfig.threads   = (optional) number of threads to run the sets on (requires the
+%                               set to be split using either numSets or numPoints)
 %
 %   Returns: 
-%       proximatePoints   = cell array. Each cell represents an (input) search
-%                           point, the values in the cell are the indices
-%                           of the (input) retrieval points which are within
-%                           the search point's radius
+%       proximatePoints   	  = cell array. Each cell represents an (input) search point, the values in the cell are the indices
+%                               of the (input) retrieval points which are within the search point's radius
 %   
 %
-%   Copyright (c) 2019, Max van den Boom
+%   Copyright 2019, Max van den Boom
 
 %   This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
 %   as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -40,18 +38,18 @@ function [proximatePoints] = retrieveRadialProximatePoints_split(retrievalPoints
     % return if there are no points to process
     if totalPoints == 0, return; end
     
-    %%%
-    %% split
-    %%%
+    %%
+    % split
+    %
     [retVal, splitConfig, numSets, ~, ranges] = mx.misc.prepareSplitProcessing(totalPoints, splitConfig);
     if retVal == 0
         return;
     end
     
     
-    %%%
-    %% function
-    %%%
+    %%
+    % function
+    %
         
     % create the variable to store the cumulated results
     setPoints = cell(numSets, 1);

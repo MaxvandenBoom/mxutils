@@ -2,13 +2,13 @@
 %   Determine which points in 3D space are close to a set of cylinders in the same space given a specific radius
 %   [proximatePoints, distOnAxis, distFromAxis] = retrieveRadialProximatePoints(retrievalPoints, searchPoints, radius, [usePreExclusion])
 %
-%   retrievalPoints = the points in 3D space (n-by-3 matrix) which are being searched in (to be retrieved)
-%   searchCylinders = the cylinders in 3D space (n-by-6 matrix), where each row defines a cylinder within which to search
-%   radius          = the radius of the cylinders from which a retrieval point will be considered close
-%   usePreExclusion = [optional, 0 or 1; default = 1) perform pre-exclusion of retrieval-points for each cylinder based on
-%                     a search radius. This is beneficial when with a larger number of retrieval-points/search-cylinders, 
-%                     and/or when limited memory is available; for smaller numbers of retrieval-points and search-cylinders, set
-%                     this parameter to 0
+%   	retrievalPoints   = the points in 3D space (n-by-3 matrix) which are being searched in (to be retrieved)
+%   	searchCylinders   = the cylinders in 3D space (n-by-6 matrix), where each row defines a cylinder within which to search
+%   	radius            = the radius of the cylinders from which a retrieval point will be considered close
+%   	usePreExclusion   = [optional, 0 or 1; default = 1) perform pre-exclusion of retrieval-points for each cylinder based on
+%                    		a search radius. This is beneficial when with a larger number of retrieval-points/search-cylinders, 
+%                     		and/or when limited memory is available; for smaller numbers of retrieval-points and search-cylinders, set
+%                     		this parameter to 0
 % 
 %
 %   Returns: 
@@ -27,7 +27,8 @@
 %                           of the retrieval points to the cylinder axis. So
 %                           the shortest distance of the point to the axis
 %
-%   Copyright (c) 2019, Max van den Boom
+%
+%   Copyright, 2019, Max van den Boom
 
 %   This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License
 %   as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
